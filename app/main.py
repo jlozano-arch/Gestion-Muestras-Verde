@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
@@ -15,6 +15,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 import json
 import os
+import shutil
 
 from .database import get_db, create_tables
 from .models import Sample, Tasting, Shipment, Event, Document, SampleStatus
@@ -34,6 +35,10 @@ app = FastAPI(
 static_path = Path(__file__).parent / "static"
 static_path.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+# Mount uploads for served documents
+uploads_path = Path.cwd() / "uploads"
+uploads_path.mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
 # Setup templates
 templates_path = Path(__file__).parent / "templates"
@@ -87,6 +92,14 @@ async def list_samples(
     request: Request,
     status: str = None,
     country: str = None,
+    producer: str = None,
+    supplier_reference: str = None,
+    purchase_cvc: str = None,
+    sales_cvv: str = None,
+    quality: str = None,
+    commercial_result: str = None,
+    indian_min: float = None,
+    indian_max: float = None,
     db: Session = Depends(get_db)
 ):
     """Lista de muestras"""
@@ -96,6 +109,28 @@ async def list_samples(
         query = query.filter(Sample.status == status)
     if country:
         query = query.filter(Sample.country_code == country)
+    if producer:
+        query = query.filter(Sample.producer.ilike(f"%{producer}%"))
+    if supplier_reference:
+        query = query.filter(Sample.supplier_reference.ilike(f"%{supplier_reference}%"))
+    if purchase_cvc:
+        query = query.filter(Sample.purchase_contract_cvc == purchase_cvc)
+    if sales_cvv:
+        query = query.filter(Sample.sales_contract_cvv == sales_cvv)
+    if quality:
+        query = query.filter(Sample.quality.ilike(f"%{quality}%"))
+    if commercial_result:
+        query = query.filter(Sample.commercial_result == commercial_result)
+
+    # Indian score range filter: join tastings
+    if indian_min is not None or indian_max is not None:
+        tquery = db.query(Sample).join(Tasting)
+        if indian_min is not None:
+            tquery = tquery.filter(Tasting.indian_score >= indian_min)
+        if indian_max is not None:
+            tquery = tquery.filter(Tasting.indian_score <= indian_max)
+        ids = [s.id for s in tquery.distinct().all()]
+        query = query.filter(Sample.id.in_(ids))
     
     samples = query.order_by(desc(Sample.created_at)).all()
     
@@ -126,6 +161,15 @@ async def create_sample(
     country_code: str = Form(...),
     origin: str = Form(...),
     producer: str = Form(...),
+    supplier_reference: str = Form(None),
+    provider_sample_number: str = Form(None),
+    purchase_contract_cvc: str = Form(None),
+    sales_contract_cvv: str = Form(None),
+    quality: str = Form(None),
+    warehouse: str = Form(None),
+    sample_type: str = Form(None),
+    category: str = Form(None),
+    commercial_result: str = Form(None),
     harvest_date: str = Form(...),
     variety: str = Form(...),
     altitude: int = Form(...),
@@ -147,6 +191,15 @@ async def create_sample(
         country_name=get_country_name(country_code),
         origin=origin,
         producer=producer,
+        supplier_reference=supplier_reference,
+        provider_sample_number=provider_sample_number,
+        purchase_contract_cvc=purchase_contract_cvc,
+        sales_contract_cvv=sales_contract_cvv,
+        quality=quality,
+        warehouse=warehouse,
+        sample_type=sample_type,
+        category=category,
+        commercial_result=commercial_result,
         harvest_date=harvest_date,
         variety=variety,
         altitude=altitude,
@@ -205,6 +258,29 @@ async def sample_detail(
         "best_tasting": best_tasting,
         "flag": get_country_flag(sample.country_code),
     })
+
+
+@app.post("/samples/{sample_id}/documents")
+async def upload_document(sample_id: int, file: UploadFile = File(...), document_type: str = Form(None), db: Session = Depends(get_db)):
+    """Upload a document or photo for a sample"""
+    sample = db.query(Sample).filter(Sample.id == sample_id).first()
+    if not sample:
+        raise HTTPException(status_code=404, detail="Sample not found")
+
+    upload_dir = os.path.join("uploads", str(sample_id))
+    os.makedirs(upload_dir, exist_ok=True)
+    filename = os.path.basename(file.filename)
+    safe_name = f"{int(datetime.utcnow().timestamp())}_{filename}"
+    save_path = os.path.join(upload_dir, safe_name)
+
+    with open(save_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    doc = Document(sample_id=sample.id, file_name=filename, file_path=save_path, file_type=document_type or file.content_type)
+    db.add(doc)
+    db.commit()
+
+    return RedirectResponse(f"/samples/{sample_id}", status_code=303)
 
 
 # ============================================================================
@@ -375,8 +451,8 @@ async def generate_label(sample_id: int, db: Session = Depends(get_db)):
         Tasting.sample_id == sample_id
     ).order_by(desc(Tasting.indian_score)).first()
     
-    # Generate QR code
-    qr_data = f"MUESTRAS:{sample.code}:{sample_id}"
+    # Generate QR code pointing to the sample detail (public relative URL)
+    qr_data = f"http://localhost:8000/samples/{sample_id}"
     qr = qrcode.QRCode(version=1, box_size=4, border=1)
     qr.add_data(qr_data)
     qr.make(fit=True)
@@ -390,23 +466,44 @@ async def generate_label(sample_id: int, db: Session = Depends(get_db)):
     # Dimensions
     width, height = A6
     
-    # Title
+
+    # Title and logo
     c.setFont("Helvetica-Bold", 10)
     c.drawString(10*mm, height - 10*mm, "INDIAN ECOTRADE")
     c.setFont("Helvetica", 8)
     c.drawString(10*mm, height - 15*mm, "Café Verde")
-    
-    # Sample info
+
+    # Try to draw logo if exists
+    try:
+        logo_path = Path(__file__).parent / "static" / "logo.png"
+        if logo_path.exists():
+            logo_reader = ImageReader(str(logo_path))
+            c.drawImage(logo_reader, width - 40*mm, height - 18*mm, width=28*mm, height=12*mm, preserveAspectRatio=True, mask='auto')
+    except Exception:
+        pass
+
+    # Sample info block
     c.setFont("Helvetica-Bold", 8)
     c.drawString(10*mm, height - 22*mm, f"Código: {sample.code}")
     c.setFont("Helvetica", 7)
-    c.drawString(10*mm, height - 26*mm, f"País: {sample.country_name} {get_country_flag(sample.country_code)}")
+    # country and flag (flag may be emoji)
+    try:
+        flag = get_country_flag(sample.country_code)
+    except Exception:
+        flag = ''
+    c.drawString(10*mm, height - 26*mm, f"País: {sample.country_name} {flag}")
     c.drawString(10*mm, height - 29*mm, f"Origen: {sample.origin}")
-    c.drawString(10*mm, height - 32*mm, f"Variedad: {sample.variety}")
-    
+    c.drawString(10*mm, height - 32*mm, f"Calidad: {sample.quality or '-'}")
+    c.drawString(10*mm, height - 35*mm, f"Proveedor: {sample.producer or '-'}")
+    c.drawString(10*mm, height - 38*mm, f"Ref. proveedor: {sample.supplier_reference or '-'}")
+    c.drawString(10*mm, height - 41*mm, f"Contrato CVC: {sample.purchase_contract_cvc or '-'}")
+    if sample.sales_contract_cvv:
+        c.drawString(10*mm, height - 44*mm, f"Contrato CVV: {sample.sales_contract_cvv}")
+    c.drawString(10*mm, height - 47*mm, f"Disponibles: {sample.available_quantity} kg")
+
     if best_tasting:
         c.setFont("Helvetica-Bold", 8)
-        c.drawString(10*mm, height - 37*mm, f"Indian Score: {best_tasting.indian_score:.1f}")
+        c.drawString(10*mm, height - 51*mm, f"Indian Score: {best_tasting.indian_score:.1f}")
     
     # QR Code
     qr_path = io.BytesIO()
@@ -414,7 +511,7 @@ async def generate_label(sample_id: int, db: Session = Depends(get_db)):
     qr_path.seek(0)
     
     try:
-        c.drawImage(ImageReader(qr_path), width - 35*mm, height - 35*mm, width=25*mm, height=25*mm)
+        c.drawImage(ImageReader(qr_path), width - 35*mm, 10*mm, width=25*mm, height=25*mm)
     except:
         pass
     
@@ -479,22 +576,51 @@ async def import_excel(file: UploadFile = File(...), db: Session = Depends(get_d
         
         for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             try:
-                code, country, origin, producer, harvest, variety, altitude, processing, quantity = row[:9]
-                
+                # Try to unpack common columns; handle extra optional columns
+                values = list(row)
+                code = values[0] if len(values) > 0 else None
+                country = values[1] if len(values) > 1 else None
+                origin = values[2] if len(values) > 2 else None
+                producer = values[3] if len(values) > 3 else None
+                harvest = values[4] if len(values) > 4 else None
+                variety = values[5] if len(values) > 5 else None
+                altitude = values[6] if len(values) > 6 else None
+                processing = values[7] if len(values) > 7 else None
+                quantity = values[8] if len(values) > 8 else None
+                # extra fields
+                supplier_reference = values[9] if len(values) > 9 else None
+                provider_sample_number = values[10] if len(values) > 10 else None
+                purchase_cvc = values[11] if len(values) > 11 else None
+                sales_cvv = values[12] if len(values) > 12 else None
+                quality = values[13] if len(values) > 13 else None
+                warehouse = values[14] if len(values) > 14 else None
+                sample_type = values[15] if len(values) > 15 else None
+                category = values[16] if len(values) > 16 else None
+                comments = values[17] if len(values) > 17 else None
+
                 if not code:
                     continue
-                
+
                 existing = db.query(Sample).filter(Sample.code == code).first()
                 if existing:
                     errors.append(f"Row {row_idx}: Código duplicado")
                     continue
-                
+
                 sample = Sample(
                     code=str(code).strip(),
-                    country_code=str(country).strip()[:5],
-                    country_name=get_country_name(str(country).strip()[:5]),
+                    country_code=str(country).strip()[:5] if country else None,
+                    country_name=get_country_name(str(country).strip()[:5]) if country else None,
                     origin=str(origin).strip() if origin else "",
                     producer=str(producer).strip() if producer else "",
+                    supplier_reference=str(supplier_reference).strip() if supplier_reference else None,
+                    provider_sample_number=str(provider_sample_number).strip() if provider_sample_number else None,
+                    purchase_contract_cvc=str(purchase_cvc).strip() if purchase_cvc else None,
+                    sales_contract_cvv=str(sales_cvv).strip() if sales_cvv else None,
+                    quality=str(quality).strip() if quality else None,
+                    warehouse=str(warehouse).strip() if warehouse else None,
+                    sample_type=str(sample_type).strip() if sample_type else None,
+                    category=str(category).strip() if category else None,
+                    notes=str(comments).strip() if comments else None,
                     harvest_date=str(harvest).strip() if harvest else "",
                     variety=str(variety).strip() if variety else "",
                     altitude=int(altitude) if altitude else 0,
@@ -502,10 +628,10 @@ async def import_excel(file: UploadFile = File(...), db: Session = Depends(get_d
                     initial_quantity=float(quantity) if quantity else 0,
                     available_quantity=float(quantity) if quantity else 0,
                 )
-                
+
                 db.add(sample)
                 imported += 1
-                
+
             except Exception as e:
                 errors.append(f"Row {row_idx}: {str(e)}")
         
@@ -518,6 +644,11 @@ async def import_excel(file: UploadFile = File(...), db: Session = Depends(get_d
     
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/import", response_class=HTMLResponse)
+async def import_form(request: Request):
+    return templates.TemplateResponse("import.html", {"request": request})
 
 
 # ============================================================================

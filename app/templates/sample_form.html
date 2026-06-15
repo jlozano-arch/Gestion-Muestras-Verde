@@ -3,92 +3,41 @@
 {% block title %}Nueva Muestra{% endblock %}
 
 {% block content %}
-<div class="form-view">
-    <h2>Registrar Nueva Muestra</h2>
+<div class="page-header">
+    <div>
+        <span class="eyebrow"><i class="fa-solid fa-seedling"></i> Registro</span>
+        <h2>Registrar nueva muestra</h2>
+        <p class="lead">Completa los datos del lote y define el origen, variedad y parámetros técnicos para controlar mejor el stock.</p>
+    </div>
+</div>
 
+<div class="form-view card">
     <form method="post" action="/samples" class="sample-form">
-        <fieldset>
-            <legend>Información Básica</legend>
-            
-            <div class="form-group">
-                <label>Código de Muestra *</label>
-                <input type="text" name="code" required placeholder="Ej: CO-HUILA-001">
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label>País Origen *</label>
-                    <select name="country_code" required>
-                        <option value="">Seleccionar...</option>
-                        {% for code, country in countries.items() %}
-                            <option value="{{ code }}">{{ country.flag }} {{ country.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Región/Origen *</label>
-                    <input type="text" name="origin" required placeholder="Ej: Huila">
-                </div>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Productor *</label>
-                    <input type="text" name="producer" required placeholder="Nombre del productor">
-                </div>
-
-                <div class="form-group">
-                    <label>Variedad *</label>
-                    <input type="text" name="variety" required placeholder="Ej: Geisha, Bourbon, Typica">
-                </div>
-            </div>
-        </fieldset>
-
-        <fieldset>
-            <legend>Datos Técnicos</legend>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Fecha de Cosecha *</label>
-                    <input type="text" name="harvest_date" required placeholder="Ej: 2025-12">
-                </div>
-
-                <div class="form-group">
-                    <label>Altitud (m.s.n.m.)</label>
-                    <input type="number" name="altitude" placeholder="Ej: 1800">
-                </div>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Método de Procesamiento *</label>
-                    <select name="processing" required>
-                        <option value="">Seleccionar...</option>
-                        {% for method in processing_methods %}
-                            <option value="{{ method }}">{{ method }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Cantidad Inicial (kg) *</label>
-                    <input type="number" name="initial_quantity" required step="0.1" min="0" placeholder="Ej: 500">
-                </div>
-            </div>
-        </fieldset>
-
+        <div class="fieldset-grid">
+            <fieldset>
+                <legend>Información básica</legend>
+                <div class="form-group"><label>Código de muestra *</label><input type="text" name="code" required placeholder="Ej: CO-HUILA-001"></div>
+                <div class="form-row"><div class="form-group"><label>País origen *</label><select name="country_code" required><option value="">Seleccionar...</option>{% for code, country in countries.items() %}<option value="{{ code }}">{{ country.flag }} {{ country.name }}</option>{% endfor %}</select></div><div class="form-group"><label>Región/Origen *</label><input type="text" name="origin" required placeholder="Ej: Huila"></div></div>
+                <div class="form-row"><div class="form-group"><label>Productor *</label><input type="text" name="producer" required placeholder="Nombre del productor"></div><div class="form-group"><label>Variedad *</label><input type="text" name="variety" required placeholder="Ej: Geisha, Bourbon, Typica"></div></div>
+                <div class="form-row"><div class="form-group"><label>Referencia proveedor</label><input type="text" name="supplier_reference" placeholder="Ref proveedor"></div><div class="form-group"><label>Nº muestra proveedor</label><input type="text" name="provider_sample_number" placeholder="Nº proveedor"></div></div>
+            </fieldset>
+            <fieldset>
+                <legend>Datos técnicos</legend>
+                <div class="form-row"><div class="form-group"><label>Fecha de cosecha *</label><input type="text" name="harvest_date" required placeholder="Ej: 2025-12"></div><div class="form-group"><label>Altitud (m.s.n.m.)</label><input type="number" name="altitude" placeholder="Ej: 1800"></div></div>
+                <div class="form-row"><div class="form-group"><label>Método de procesamiento *</label><select name="processing" required><option value="">Seleccionar...</option>{% for method in processing_methods %}<option value="{{ method }}">{{ method }}</option>{% endfor %}</select></div><div class="form-group"><label>Cantidad inicial (kg) *</label><input type="number" name="initial_quantity" required step="0.1" min="0" placeholder="Ej: 500"></div></div>
+                <div class="form-row"><div class="form-group"><label>Calidad</label><input type="text" name="quality" placeholder="Ej: Specialty"></div><div class="form-group"><label>Almacén</label><input type="text" name="warehouse" placeholder="Ubicación almacén"></div></div>
+                <div class="form-row"><div class="form-group"><label>Tipo de muestra</label><input type="text" name="sample_type" placeholder="Ej: Lote, Muestra técnica"></div><div class="form-group"><label>Categoría</label><input type="text" name="category" placeholder="Ej: Premium"></div></div>
+                <div class="form-row"><div class="form-group"><label>Contrato CVC</label><input type="text" name="purchase_contract_cvc" placeholder="CVC"></div><div class="form-group"><label>Contrato CVV</label><input type="text" name="sales_contract_cvv" placeholder="CVV"></div></div>
+                <div class="form-row"><div class="form-group"><label>Resultado comercial</label><input type="text" name="commercial_result" placeholder="Ej: Aprobado"></div><div class="form-group"></div></div>
+            </fieldset>
+        </div>
         <fieldset>
             <legend>Notas</legend>
-            <div class="form-group">
-                <label>Observaciones</label>
-                <textarea name="notes" rows="4" placeholder="Observaciones iniciales..."></textarea>
-            </div>
+            <div class="form-group"><label>Observaciones</label><textarea name="notes" rows="4" placeholder="Observaciones iniciales..."></textarea></div>
         </fieldset>
-
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Registrar Muestra</button>
-            <a href="/samples" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Registrar muestra</button>
+            <a href="/samples" class="btn btn-secondary"><i class="fa-solid fa-times"></i> Cancelar</a>
         </div>
     </form>
 </div>
@@ -98,13 +47,8 @@
 <script>
     document.querySelector('.sample-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
         const formData = new FormData(e.target);
-        const response = await fetch('/samples', {
-            method: 'POST',
-            body: formData
-        });
-        
+        const response = await fetch('/samples', { method: 'POST', body: formData });
         if (response.ok) {
             const data = await response.json();
             window.location.href = '/samples/' + data.id;

@@ -4,41 +4,65 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Gestión de Muestras de Café Verde{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-nx6qozx18aQ5Sw+IGYTLk2Z6l3ZBzONbp8cVFceiqGQpM/hjD/tZPZ6j9aHWnAVulhXc0j3ZxL0XYxM6Gr5v0A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
     {% block extra_css %}{% endblock %}
 </head>
-<body>
-    <nav class="navbar">
-        <div class="navbar-content">
-            <div class="navbar-brand">
-                <h1>☕ Indian Ecotrade</h1>
-                <p>Gestión de Café Verde</p>
+<body class="app-shell">
+    <header class="topbar">
+        <div class="topbar-inner">
+            <div class="brand">
+                <div class="brand-mark">IE</div>
+                <div class="brand-title">
+                    <h1>Indian Ecotrade</h1>
+                    <p>Panel de gestión de café verde</p>
+                </div>
             </div>
-            <ul class="navbar-menu">
-                <li><a href="/">Dashboard</a></li>
-                <li><a href="/samples">Muestras</a></li>
-                <li><a href="/samples/new">Nueva Muestra</a></li>
-                <li><a href="/compare">Comparador</a></li>
-            </ul>
+            <nav>
+                <ul class="topbar-nav">
+                    <li><a class="topbar-link" href="/"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+                    <li><a class="topbar-link" href="/samples"><i class="fa-solid fa-cubes-stacked"></i> Muestras</a></li>
+                    <li><a class="topbar-link" href="/samples/new"><i class="fa-solid fa-plus-circle"></i> Nueva Muestra</a></li>
+                    <li><a class="topbar-link" href="/compare"><i class="fa-solid fa-scale-balanced"></i> Comparador</a></li>
+                    <li><a class="topbar-link" href="#configuracion"><i class="fa-solid fa-gear"></i> Configuración</a></li>
+                </ul>
+            </nav>
         </div>
-    </nav>
+    </header>
 
     <main class="container">
         {% block content %}{% endblock %}
     </main>
+
+    <section id="configuracion" class="config-panel card">
+        <div class="card-header">
+            <div>
+                <h3>Configuración general</h3>
+                <p>Accede a ajustes globales de la aplicación y la visualización de informes desde este panel central.</p>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="config-grid">
+                <div class="config-card"><strong>Empresa</strong><p>Indian Ecotrade</p></div>
+                <div class="config-card"><strong>Sector</strong><p>Trading de café verde</p></div>
+                <div class="config-card"><strong>Temática</strong><p>Gestión de muestras y laboratorio</p></div>
+            </div>
+        </div>
+    </section>
 
     <footer class="footer">
         <p>&copy; 2026 Indian Ecotrade. Gestión de Café Verde.</p>
     </footer>
 
     <script>
-        // Auto-hide flash messages
         document.querySelectorAll('.alert').forEach(alert => {
-            setTimeout(() => {
-                alert.style.display = 'none';
-            }, 5000);
+            setTimeout(() => alert.style.display = 'none', 5000);
         });
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

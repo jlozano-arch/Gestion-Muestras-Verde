@@ -35,3 +35,30 @@ def get_db():
 def create_tables():
     """Create all tables"""
     Base.metadata.create_all(bind=engine)
+    # Ensure new columns exist for Sample (simple automatic migration for SQLite)
+    try:
+        with engine.connect() as conn:
+            res = conn.execute("PRAGMA table_info('samples')")
+            existing = {row[1] for row in res.fetchall()}
+
+            # desired columns and their SQLite types
+            extras = {
+                'supplier_reference': 'TEXT',
+                'provider_sample_number': 'TEXT',
+                'purchase_contract_cvc': 'TEXT',
+                'sales_contract_cvv': 'TEXT',
+                'quality': 'TEXT',
+                'warehouse': 'TEXT',
+                'sample_type': 'TEXT',
+                'category': 'TEXT',
+                'commercial_result': 'TEXT',
+            }
+
+            for col, coltype in extras.items():
+                if col not in existing:
+                    try:
+                        conn.execute(f"ALTER TABLE samples ADD COLUMN {col} {coltype}")
+                    except Exception:
+                        pass
+    except Exception:
+        pass

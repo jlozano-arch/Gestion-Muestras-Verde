@@ -3,187 +3,167 @@
 {% block title %}{{ sample.code }} - Detalle de Muestra{% endblock %}
 
 {% block content %}
-<div class="sample-detail-view">
+<div class="page-header">
+    <div>
+        <span class="eyebrow"><i class="fa-solid fa-magnifying-glass-chart"></i> Detalle</span>
+        <h2>{{ sample.code }}</h2>
+        <p class="lead">Vista detallada del lote de café verde con todas las catas, envíos y documentos disponibles en una sola experiencia.</p>
+    </div>
+    <div class="page-actions">
+        <a href="/samples/{{ sample.id }}/label" class="btn btn-secondary" target="_blank"><i class="fa-solid fa-file-pdf"></i> Etiqueta PDF</a>
+        <a href="/samples" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Volver</a>
+    </div>
+</div>
+
+<div class="sample-detail-view card">
     <div class="sample-header">
         <div class="sample-title">
-            <h2>{{ sample.code }}</h2>
-            <span class="country-flag">{{ flag }}</span>
+            <div class="sample-chip"><span class="country-flag">{{ flag }}</span></div>
+            <div>
+                <p class="eyebrow"><i class="fa-solid fa-certificate"></i> Código de muestra</p>
+                <h2>{{ sample.code }}</h2>
+                <p class="lead">{{ sample.origin }}, {{ sample.country_name }} • {{ sample.producer }}</p>
+            </div>
         </div>
-        <div class="sample-status">
-            <span class="status-badge status-{{ sample.status }}">{{ sample.status }}</span>
-            <span class="quantity-info">{{ sample.available_quantity }} / {{ sample.initial_quantity }} kg</span>
+        <div class="sample-meta">
+            <span class="status-badge status-{{ sample.status|lower|replace(' ', '-') }}">{{ sample.status }}</span>
+            <div class="sample-summary">
+                <div>
+                    <span class="summary-label">Disponibles</span>
+                    <strong>{{ sample.available_quantity }} / {{ sample.initial_quantity }} kg</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="detail-metrics">
+        <div class="metric-card">
+            <span class="metric-label">Indian Score</span>
+            <strong>{{ best_tasting and ('%.1f'|format(best_tasting.indian_score)) or 'N/A' }}</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Resultado comercial</span>
+            <strong>{{ best_tasting and ('%.1f'|format(best_tasting.commercial_score)) or 'N/A' }}</strong>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Estado actual</span>
+            <strong>{{ sample.status }}</strong>
         </div>
     </div>
 
     <div class="sample-tabs">
         <div class="tabs">
-            <button class="tab-button active" onclick="showTab('info')">Información</button>
-            <button class="tab-button" onclick="showTab('tastings')">Catas</button>
-            <button class="tab-button" onclick="showTab('shipments')">Envíos</button>
-            <button class="tab-button" onclick="showTab('timeline')">Timeline</button>
-            <button class="tab-button" onclick="showTab('documents')">Documentos</button>
+            <button class="tab-button active" onclick="showTab(event, 'info')"><i class="fa-solid fa-info-circle"></i> Información</button>
+            <button class="tab-button" onclick="showTab(event, 'tastings')"><i class="fa-solid fa-mortar-pestle"></i> Catas</button>
+            <button class="tab-button" onclick="showTab(event, 'shipments')"><i class="fa-solid fa-truck-fast"></i> Envíos</button>
+            <button class="tab-button" onclick="showTab(event, 'timeline')"><i class="fa-solid fa-clock"></i> Timeline</button>
+            <button class="tab-button" onclick="showTab(event, 'documents')"><i class="fa-solid fa-file-lines"></i> Documentos</button>
         </div>
 
         <div id="info" class="tab-content active">
             <div class="info-grid">
-                <div class="info-card">
-                    <h4>Origen</h4>
-                    <p>{{ sample.origin }}, {{ sample.country_name }}</p>
-                </div>
-                <div class="info-card">
-                    <h4>Productor</h4>
-                    <p>{{ sample.producer }}</p>
-                </div>
-                <div class="info-card">
-                    <h4>Variedad</h4>
-                    <p>{{ sample.variety }}</p>
-                </div>
-                <div class="info-card">
-                    <h4>Cosecha</h4>
-                    <p>{{ sample.harvest_date }}</p>
-                </div>
-                <div class="info-card">
-                    <h4>Procesamiento</h4>
-                    <p>{{ sample.processing }}</p>
-                </div>
-                <div class="info-card">
-                    <h4>Altitud</h4>
-                    <p>{{ sample.altitude }} m.s.n.m.</p>
-                </div>
+                <div class="info-card"><h4>Origen</h4><p>{{ sample.origin }}, {{ sample.country_name }}</p></div>
+                <div class="info-card"><h4>Productor</h4><p>{{ sample.producer }}</p></div>
+                <div class="info-card"><h4>Proveedor - Ref</h4><p>{{ sample.supplier_reference or '-' }}</p></div>
+                <div class="info-card"><h4>Nº muestra proveedor</h4><p>{{ sample.provider_sample_number or '-' }}</p></div>
+                <div class="info-card"><h4>Variedad</h4><p>{{ sample.variety }}</p></div>
+                <div class="info-card"><h4>Cosecha</h4><p>{{ sample.harvest_date }}</p></div>
+                <div class="info-card"><h4>Contrato CVC</h4><p>{{ sample.purchase_contract_cvc or '-' }}</p></div>
+                <div class="info-card"><h4>Contrato CVV</h4><p>{{ sample.sales_contract_cvv or '-' }}</p></div>
+                <div class="info-card"><h4>Procesamiento</h4><p>{{ sample.processing }}</p></div>
+                <div class="info-card"><h4>Altitud</h4><p>{{ sample.altitude }} m.s.n.m.</p></div>
+                <div class="info-card"><h4>Calidad</h4><p>{{ sample.quality or '-' }}</p></div>
+                <div class="info-card"><h4>Almacén</h4><p>{{ sample.warehouse or '-' }}</p></div>
+                <div class="info-card"><h4>Tipo</h4><p>{{ sample.sample_type or '-' }}</p></div>
+                <div class="info-card"><h4>Categoría</h4><p>{{ sample.category or '-' }}</p></div>
+                <div class="info-card"><h4>Resultado comercial</h4><p>{{ sample.commercial_result or '-' }}</p></div>
             </div>
-            
+
             {% if sample.notes %}
-            <div class="notes-section">
+            <div class="notes-section card">
                 <h4>Notas</h4>
                 <p>{{ sample.notes }}</p>
             </div>
             {% endif %}
 
             {% if best_tasting %}
-            <div class="best-tasting">
-                <h4>Mejor Evaluación</h4>
+            <div class="best-tasting card">
+                <h4>Mejor evaluación</h4>
                 <div class="score-display">
-                    <div class="score-card">
-                        <span class="score-label">Indian Score</span>
-                        <span class="score-value">{{ "%.1f"|format(best_tasting.indian_score) }}</span>
-                    </div>
-                    <div class="score-card">
-                        <span class="score-label">Puntuación de Taza</span>
-                        <span class="score-value">{{ "%.1f"|format(best_tasting.cup_score) }}</span>
-                    </div>
-                    <div class="score-card">
-                        <span class="score-label">Viabilidad Comercial</span>
-                        <span class="score-value">{{ "%.1f"|format(best_tasting.commercial_score) }}</span>
-                    </div>
+                    <div class="score-card"><span class="score-label">Indian Score</span><span class="score-value">{{ "%.1f"|format(best_tasting.indian_score) }}</span></div>
+                    <div class="score-card"><span class="score-label">Puntuación de taza</span><span class="score-value">{{ "%.1f"|format(best_tasting.cup_score) }}</span></div>
+                    <div class="score-card"><span class="score-label">Viabilidad comercial</span><span class="score-value">{{ "%.1f"|format(best_tasting.commercial_score) }}</span></div>
                 </div>
             </div>
             {% endif %}
-
-            <div class="action-buttons">
-                <a href="/samples/{{ sample.id }}/label" class="btn btn-secondary" target="_blank">📄 Generar Etiqueta PDF</a>
-            </div>
         </div>
 
         <div id="tastings" class="tab-content">
-            <h3>Evaluaciones de Cata</h3>
-            
+            <h3>Evaluaciones de cata</h3>
             {% if tastings %}
                 {% for tasting in tastings %}
-                <div class="tasting-card">
+                <div class="tasting-card card">
                     <div class="tasting-header">
-                        <h4>{{ tasting.evaluator }} - {{ tasting.tasting_date.strftime('%d/%m/%Y') }}</h4>
+                        <h4>{{ tasting.evaluator }} • {{ tasting.tasting_date.strftime('%d/%m/%Y') }}</h4>
                         <div class="tasting-scores">
-                            <span class="score indian-score">Indian Score: {{ "%.1f"|format(tasting.indian_score) }}</span>
-                            <span class="score cup-score">Cup: {{ "%.1f"|format(tasting.cup_score) }}</span>
+                            <span class="score indian-score"><i class="fa-solid fa-star"></i> {{ "%.1f"|format(tasting.indian_score) }}</span>
+                            <span class="score cup-score"><i class="fa-solid fa-mug-hot"></i> {{ "%.1f"|format(tasting.cup_score) }}</span>
                         </div>
                     </div>
-                    
                     <div class="tasting-data">
-                        <div class="data-row">
-                            <span>Criba 18+:</span> <strong>{{ "%.1f"|format(tasting.sieve_18) }}%</strong>
-                            <span>Criba 16+:</span> <strong>{{ "%.1f"|format(tasting.sieve_16) }}%</strong>
-                            <span>Criba 14+:</span> <strong>{{ "%.1f"|format(tasting.sieve_14) }}%</strong>
-                        </div>
-                        <div class="data-row">
-                            <span>Humedad:</span> <strong>{{ "%.1f"|format(tasting.humidity) }}%</strong>
-                            <span>Defectos Primarios:</span> <strong>{{ tasting.defects_primary }}</strong>
-                            <span>Defectos Secundarios:</span> <strong>{{ tasting.defects_secondary }}</strong>
-                        </div>
+                        <div class="data-row"><span>Criba 18+:</span><strong>{{ "%.1f"|format(tasting.sieve_18) }}%</strong><span>Criba 16+:</span><strong>{{ "%.1f"|format(tasting.sieve_16) }}%</strong><span>Criba 14+:</span><strong>{{ "%.1f"|format(tasting.sieve_14) }}%</strong></div>
+                        <div class="data-row"><span>Humedad:</span><strong>{{ "%.1f"|format(tasting.humidity) }}%</strong><span>Defectos primarios:</span><strong>{{ tasting.defects_primary }}</strong><span>Defectos secundarios:</span><strong>{{ tasting.defects_secondary }}</strong></div>
                     </div>
-
                     {% if tasting.tasting_notes %}
-                    <div class="tasting-notes">
-                        <strong>Notas de Cata:</strong>
-                        <p>{{ tasting.tasting_notes }}</p>
-                    </div>
+                    <div class="tasting-notes"><strong>Notas de cata:</strong><p>{{ tasting.tasting_notes }}</p></div>
                     {% endif %}
-
                     {% if tasting.recommendations %}
-                    <div class="tasting-recommendations">
-                        <strong>Recomendaciones:</strong>
-                        <p>{{ tasting.recommendations }}</p>
-                    </div>
+                    <div class="tasting-recommendations"><strong>Recomendaciones:</strong><p>{{ tasting.recommendations }}</p></div>
                     {% endif %}
                 </div>
                 {% endfor %}
             {% else %}
                 <p class="empty">No hay evaluaciones registradas</p>
             {% endif %}
-
-            <button onclick="showTastingForm()" class="btn btn-primary">+ Agregar Cata</button>
-            <div id="tasting-form" style="display: none;">
-                {% include "tasting_form.html" %}
-            </div>
+            <button onclick="showTastingForm()" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Agregar cata</button>
+            <div id="tasting-form" style="display: none;">{% include "tasting_form.html" %}</div>
         </div>
 
         <div id="shipments" class="tab-content">
-            <h3>Registro de Envíos</h3>
-            
+            <h3>Registro de envíos</h3>
             {% if shipments %}
+                <div class="table-responsive">
                 <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Referencia</th>
-                            <th>Cantidad (kg)</th>
-                            <th>Destino</th>
-                            <th>Fecha</th>
-                            <th>Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for shipment in shipments %}
-                        <tr>
-                            <td>{{ shipment.reference }}</td>
-                            <td>{{ shipment.quantity }}</td>
-                            <td>{{ shipment.destination }}</td>
-                            <td>{{ shipment.shipment_date.strftime('%d/%m/%Y') }}</td>
-                            <td><span class="status-badge">{{ shipment.status }}</span></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
+                    <thead><tr><th>Referencia</th><th>Cantidad (kg)</th><th>Destino</th><th>Fecha</th><th>Estado</th></tr></thead>
+                    <tbody>{% for shipment in shipments %}<tr><td>{{ shipment.reference }}</td><td>{{ shipment.quantity }}</td><td>{{ shipment.destination }}</td><td>{{ shipment.shipment_date.strftime('%d/%m/%Y') }}</td><td><span class="status-badge">{{ shipment.status }}</span></td></tr>{% endfor %}</tbody>
                 </table>
+                </div>
             {% else %}
                 <p class="empty">No hay envíos registrados</p>
             {% endif %}
-
             {% if sample.available_quantity > 0 %}
-            <button onclick="showShipmentForm()" class="btn btn-primary">+ Registrar Envío</button>
-            <div id="shipment-form" style="display: none;">
-                {% include "shipment_form.html" %}
-            </div>
+            <button onclick="showShipmentForm()" class="btn btn-primary"><i class="fa-solid fa-truck"></i> Registrar envío</button>
+            <div id="shipment-form" style="display: none;">{% include "shipment_form.html" %}</div>
             {% endif %}
         </div>
 
         <div id="timeline" class="tab-content">
-            <h3>Timeline de Eventos</h3>
-            
+            <h3>Timeline de eventos</h3>
             {% if events %}
                 <div class="timeline">
                     {% for event in events %}
                     <div class="timeline-event">
-                        <div class="event-date">{{ event.event_date.strftime('%d/%m/%Y %H:%M') }}</div>
-                        <div class="event-type">{{ event.event_type.upper() }}</div>
-                        <div class="event-description">{{ event.description }}</div>
+                        <div class="event-icon">
+                            {% if event.event_type == 'received' %}<i class="fa-solid fa-box-open"></i>
+                            {% elif event.event_type == 'tasted' %}<i class="fa-solid fa-mortar-pestle"></i>
+                            {% elif event.event_type == 'shipped' %}<i class="fa-solid fa-truck-fast"></i>
+                            {% else %}<i class="fa-solid fa-clock"></i>{% endif %}
+                        </div>
+                        <div>
+                            <div class="event-date">{{ event.event_date.strftime('%d/%m/%Y %H:%M') }}</div>
+                            <div class="event-type">{{ event.event_type.upper() }}</div>
+                            <div class="event-description">{{ event.description }}</div>
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
@@ -193,15 +173,29 @@
         </div>
 
         <div id="documents" class="tab-content">
-            <h3>Documentos y Fotos</h3>
-            
+            <h3>Galería de documentos</h3>
+            <div class="card">
+                <form method="post" action="/samples/{{ sample.id }}/documents" enctype="multipart/form-data">
+                    <div class="form-row"><div class="form-group"><label>Archivo</label><input type="file" name="file" required></div><div class="form-group"><label>Tipo</label><input type="text" name="document_type" placeholder="Ej: ficha_cata"></div></div>
+                    <div class="form-actions"><button class="btn btn-primary" type="submit">Subir documento</button></div>
+                </form>
+            </div>
             {% if documents %}
                 <div class="documents-grid">
                     {% for doc in documents %}
-                    <div class="document-card">
-                        <p class="doc-name">{{ doc.file_name }}</p>
-                        <small>{{ doc.file_type }}</small>
-                        <small>{{ doc.upload_date.strftime('%d/%m/%Y') }}</small>
+                    <div class="document-card gallery-card">
+                        <div class="gallery-thumb">
+                            {% if doc.file_type and doc.file_type.startswith('image') or doc.file_name.lower().endswith('.png') or doc.file_name.lower().endswith('.jpg') or doc.file_name.lower().endswith('.jpeg') %}
+                                <img src="/uploads/{{ sample.id }}/{{ doc.file_path.split('/')[-1] }}" alt="{{ doc.file_name }}" />
+                            {% else %}
+                                <i class="fa-solid fa-file-lines"></i>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <p class="doc-name"><a href="/uploads/{{ sample.id }}/{{ doc.file_path.split('/')[-1] }}" target="_blank">{{ doc.file_name }}</a></p>
+                            <small>{{ doc.file_type }}</small>
+                            <small>{{ doc.upload_date.strftime('%d/%m/%Y') }}</small>
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
@@ -222,15 +216,13 @@
 
 {% block extra_js %}
 <script>
-function showTab(tabName) {
+function showTab(evt, tabName) {
     const contents = document.querySelectorAll('.tab-content');
     const buttons = document.querySelectorAll('.tab-button');
-    
     contents.forEach(c => c.classList.remove('active'));
     buttons.forEach(b => b.classList.remove('active'));
-    
     document.getElementById(tabName).classList.add('active');
-    event.target.classList.add('active');
+    evt.currentTarget.classList.add('active');
 }
 
 function showTastingForm() {

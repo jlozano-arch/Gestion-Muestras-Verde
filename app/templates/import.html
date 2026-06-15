@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Importar Excel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <span class="eyebrow"><i class="fa-solid fa-file-excel"></i> Import</span>
+        <h2>Importar muestras desde Excel</h2>
+        <p class="lead">Sube un archivo .xlsx con las columnas básicas. Columnas extra opcionales: referencia proveedor, nº proveedor, CVC, CVV, calidad, almacén, tipo, categoría, comentarios.</p>
+    </div>
+</div>
+
+<div class="card form-view">
+    <form method="post" action="/import/excel" enctype="multipart/form-data">
+        <div class="form-group"><label>Archivo Excel</label><input type="file" name="file" accept=".xlsx" required></div>
+        <div class="form-actions"><button class="btn btn-primary" type="submit">Importar</button></div>
+    </form>
+</div>
+{% endblock %}

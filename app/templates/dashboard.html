@@ -3,68 +3,272 @@
 {% block title %}Dashboard - Gestión de Muestras{% endblock %}
 
 {% block content %}
-<div class="dashboard">
-    <h2>Dashboard</h2>
-    
-    <div class="stats-grid">
-        <div class="stat-card">
-            <h3>{{ total_samples }}</h3>
-            <p>Total de Muestras</p>
-        </div>
-        <div class="stat-card">
-            <h3>{{ available_samples }}</h3>
-            <p>Muestras Disponibles</p>
-        </div>
-        <div class="stat-card">
-            <h3>{{ total_quantity }} kg</h3>
-            <p>Cantidad Disponible</p>
-        </div>
+<div class="page-header">
+    <div>
+        <span class="eyebrow"><i class="fa-solid fa-briefcase"></i> Trading & Laboratorio</span>
+        <h2>Control avanzado de muestras</h2>
+        <p class="lead">Monitorea el estado de tus lotes, la calidad del café y el progreso comercial desde un panel ágil y profesional.</p>
     </div>
+    <div class="page-actions">
+        <a href="/samples/new" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Nueva muestra</a>
+        <a href="/samples" class="btn btn-secondary"><i class="fa-solid fa-cubes-stacked"></i> Todas las muestras</a>
+        <a href="/compare" class="btn btn-secondary"><i class="fa-solid fa-scale-balanced"></i> Comparador</a>
+    </div>
+</div>
 
-    <div class="dashboard-grid">
-        <div class="dashboard-section">
-            <h3>Muestras Recientes</h3>
+<div class="stats-grid">
+    <article class="stat-card card">
+        <div class="stat-icon"><i class="fa-solid fa-cube"></i></div>
+        <div>
+            <p class="stat-label">Total muestras</p>
+            <div class="stat-number">{{ total_samples }}</div>
+        </div>
+    </article>
+    <article class="stat-card card">
+        <div class="stat-icon"><i class="fa-solid fa-seedling"></i></div>
+        <div>
+            <p class="stat-label">Disponibles</p>
+            <div class="stat-number">{{ available_samples }}</div>
+        </div>
+    </article>
+    <article class="stat-card card">
+        <div class="stat-icon"><i class="fa-solid fa-flask"></i></div>
+        <div>
+            <p class="stat-label">En cata</p>
+            <div class="stat-number">{{ recent_samples|selectattr('status','equalto','analyzing')|list|length }}</div>
+        </div>
+    </article>
+    <article class="stat-card card">
+        <div class="stat-icon"><i class="fa-solid fa-truck-fast"></i></div>
+        <div>
+            <p class="stat-label">Compradas</p>
+            <div class="stat-number">{{ recent_samples|selectattr('status','equalto','purchased')|list|length }}</div>
+        </div>
+    </article>
+    <article class="stat-card card">
+        <div class="stat-icon"><i class="fa-solid fa-ban"></i></div>
+        <div>
+            <p class="stat-label">Rechazadas</p>
+            <div class="stat-number">{{ recent_samples|selectattr('status','equalto','rejected')|list|length }}</div>
+        </div>
+    </article>
+    <article class="stat-card card">
+        <div class="stat-icon"><i class="fa-solid fa-star"></i></div>
+        <div>
+            <p class="stat-label">Indian Score medio</p>
+            <div class="stat-number">{% if high_score_samples %}{{ (high_score_samples|map(attribute='indian_score')|sum / high_score_samples|length)|round(1) }}{% else %}0{% endif %}</div>
+        </div>
+    </article>
+</div>
+
+<div class="page-grid">
+    <section class="card chart-panel">
+        <div class="card-header">
+            <div>
+                <h3>Muestras por origen</h3>
+                <p>Distribución geográfica de los lotes recientes.</p>
+            </div>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="originChart"></canvas>
+        </div>
+    </section>
+
+    <section class="card chart-panel">
+        <div class="card-header">
+            <div>
+                <h3>Muestras por proveedor</h3>
+                <p>Ranking de productores con lotes en el panel.</p>
+            </div>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="providerChart"></canvas>
+        </div>
+    </section>
+</div>
+
+<div class="page-grid">
+    <section class="card chart-panel">
+        <div class="card-header">
+            <div>
+                <h3>Estado comercial</h3>
+                <p>Visión rápida de ventas y stock.</p>
+            </div>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="statusChart"></canvas>
+        </div>
+    </section>
+
+    <section class="card chart-panel">
+        <div class="card-header">
+            <div>
+                <h3>Evolución mensual</h3>
+                <p>Actividad reciente de muestras por mes.</p>
+            </div>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="trendChart"></canvas>
+        </div>
+    </section>
+</div>
+
+<div class="page-grid">
+    <section class="card">
+        <div class="card-header">
+            <h3>Muestras recientes</h3>
+        </div>
+        <div class="recent-list">
             {% if recent_samples %}
-                <ul class="sample-list">
                 {% for sample in recent_samples %}
-                    <li>
-                        <a href="/samples/{{ sample.id }}">
-                            <strong>{{ sample.code }}</strong>
-                            <span>{{ sample.country_name }} - {{ sample.origin }}</span>
-                            <small>{{ sample.available_quantity }} kg disponibles</small>
-                        </a>
-                    </li>
+                <div class="recent-card">
+                    <div>
+                        <strong>{{ sample.code }}</strong>
+                        <p>{{ sample.country_name }} • {{ sample.origin }}</p>
+                    </div>
+                    <div class="recent-meta">
+                        <span>{{ sample.available_quantity }} kg</span>
+                        <a href="/samples/{{ sample.id }}" class="btn btn-small btn-secondary">Ver</a>
+                    </div>
+                </div>
                 {% endfor %}
-                </ul>
             {% else %}
                 <p class="empty">No hay muestras registradas</p>
             {% endif %}
         </div>
+    </section>
 
-        <div class="dashboard-section">
-            <h3>Mejor Puntuación (Indian Score)</h3>
+    <section class="card">
+        <div class="card-header">
+            <h3>Mejor puntuación</h3>
+        </div>
+        <div class="recent-list">
             {% if high_score_samples %}
-                <ul class="sample-list">
                 {% for sample in high_score_samples %}
-                    <li>
-                        <a href="/samples/{{ sample.id }}">
-                            <strong>{{ sample.code }}</strong>
-                            <span>{{ sample.country_name }} - {{ sample.origin }}</span>
-                            <small>Puntuación excelente</small>
-                        </a>
-                    </li>
+                <div class="recent-card">
+                    <div>
+                        <strong>{{ sample.code }}</strong>
+                        <p>{{ sample.country_name }} • {{ sample.origin }}</p>
+                    </div>
+                    <div class="recent-meta">
+                        <span><i class="fa-solid fa-star"></i> {{ sample.tastings|length and sample.tastings[0].indian_score or 'N/A' }}</span>
+                        <a href="/samples/{{ sample.id }}" class="btn btn-small btn-secondary">Explorar</a>
+                    </div>
+                </div>
                 {% endfor %}
-                </ul>
             {% else %}
                 <p class="empty">Sin evaluaciones aún</p>
             {% endif %}
         </div>
-    </div>
-
-    <div class="action-buttons">
-        <a href="/samples/new" class="btn btn-primary">+ Nueva Muestra</a>
-        <a href="/samples" class="btn btn-secondary">Ver Todas las Muestras</a>
-        <a href="/compare" class="btn btn-secondary">Comparador</a>
-    </div>
+    </section>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function aggregate(items) {
+    return items.reduce((acc, item) => {
+        acc[item] = (acc[item] || 0) + 1;
+        return acc;
+    }, {});
+}
+
+const recentOrigins = [{% for sample in recent_samples %}'{{ sample.origin|escape }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+const recentProviders = [{% for sample in recent_samples %}'{{ sample.producer|escape }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+const recentStatuses = [{% for sample in recent_samples %}'{{ sample.status|escape }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+const recentMonths = [{% for sample in recent_samples %}'{{ sample.created_at.strftime('%b %Y') }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+
+const originData = aggregate(recentOrigins);
+const providerData = aggregate(recentProviders);
+const statusData = aggregate(recentStatuses);
+const monthData = aggregate(recentMonths);
+
+const originCtx = document.getElementById('originChart');
+if (originCtx) {
+    new Chart(originCtx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(originData),
+            datasets: [{
+                data: Object.values(originData),
+                backgroundColor: ['#174b2c', '#4a7f50', '#7b8f56', '#b4c18c', '#d4dcbd'],
+                borderColor: '#fff',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            plugins: { legend: { position: 'bottom', labels: { color: '#4f6b5e' } } },
+            responsive: true,
+            maintainAspectRatio: false,
+        }
+    });
+}
+
+const providerCtx = document.getElementById('providerChart');
+if (providerCtx) {
+    new Chart(providerCtx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(providerData),
+            datasets: [{
+                data: Object.values(providerData),
+                backgroundColor: '#3a7e4c',
+                borderRadius: 12,
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: { x: { ticks: { color: '#4f6b5e' } }, y: { beginAtZero: true, ticks: { color: '#4f6b5e' } } },
+            responsive: true,
+            maintainAspectRatio: false,
+        }
+    });
+}
+
+const statusCtx = document.getElementById('statusChart');
+if (statusCtx) {
+    new Chart(statusCtx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(statusData),
+            datasets: [{
+                data: Object.values(statusData),
+                backgroundColor: ['#3a7e4c', '#d1d89f', '#7b8f56', '#f2b179', '#e6d0b8'],
+                borderColor: '#fff',
+                borderWidth: 2,
+            }]
+        },
+        options: {
+            plugins: { legend: { position: 'bottom', labels: { color: '#4f6b5e' } } },
+            responsive: true,
+            maintainAspectRatio: false,
+        }
+    });
+}
+
+const trendCtx = document.getElementById('trendChart');
+if (trendCtx) {
+    new Chart(trendCtx, {
+        type: 'line',
+        data: {
+            labels: Object.keys(monthData),
+            datasets: [{
+                label: 'Muestras',
+                data: Object.values(monthData),
+                borderColor: '#174b2c',
+                backgroundColor: 'rgba(23, 75, 44, 0.16)',
+                fill: true,
+                tension: 0.35,
+                pointRadius: 4,
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: { x: { ticks: { color: '#4f6b5e' } }, y: { beginAtZero: true, ticks: { color: '#4f6b5e' } } },
+            responsive: true,
+            maintainAspectRatio: false,
+        }
+    });
+}
+</script>
 {% endblock %}

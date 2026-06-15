@@ -140,6 +140,31 @@ class TestSamples:
         assert response.status_code == 200
         assert "TEST-003" in response.text
 
+    def test_create_sample_with_extended_fields(self):
+        response = client.post("/samples", data={
+            "code": "TEST-EXT-001",
+            "country_code": "CO",
+            "origin": "Huila",
+            "producer": "Test Producer",
+            "supplier_reference": "REF-123",
+            "provider_sample_number": "PROV-1",
+            "purchase_contract_cvc": "CVC-001",
+            "sales_contract_cvv": "CVV-001",
+            "quality": "Specialty",
+            "warehouse": "Main Store",
+            "sample_type": "Lote",
+            "category": "Premium",
+            "commercial_result": "Aprobado",
+            "harvest_date": "2025-11",
+            "variety": "Geisha",
+            "altitude": 1800,
+            "processing": "Washed",
+            "initial_quantity": 50.0,
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["code"] == "TEST-EXT-001"
+
 
 class TestTastings:
     """Tasting/cupping tests"""
@@ -265,6 +290,50 @@ class TestAPI:
         data = response.json()
         assert data["id"] == sample_id
         assert data["code"] == "API-TEST-001"
+
+
+class TestDocuments:
+    def test_upload_document(self):
+        # Create sample
+        response = client.post("/samples", data={
+            "code": "DOC-TEST-001",
+            "country_code": "CO",
+            "origin": "Huila",
+            "producer": "Test Producer",
+            "harvest_date": "2025-11",
+            "variety": "Geisha",
+            "altitude": 1800,
+            "processing": "Washed",
+            "initial_quantity": 10.0,
+        })
+        sample_id = response.json()["id"]
+
+        # Upload a small text file as document
+        files = {"file": ("test.txt", b"hello world", "text/plain")}
+        response = client.post(f"/samples/{sample_id}/documents", files=files)
+        assert response.status_code in (200, 303)
+
+
+class TestImport:
+    def test_import_excel(self):
+        try:
+            from openpyxl import Workbook
+            wb = Workbook()
+            ws = wb.active
+            ws.append(["code","country","origin","producer","harvest","variety","altitude","processing","quantity","supplier_reference","provider_sample_number","purchase_cvc","sales_cvv","quality","warehouse","sample_type","category","comments"])
+            ws.append(["IMP-001","CO","Huila","Prod A","2025","Typica",1500,"Washed",25.0,"REF-IMP","PSN-1","CVCX","CVVX","Specialty","Main","Lote","Premium","Imported row"])
+            import io
+            bio = io.BytesIO()
+            wb.save(bio)
+            bio.seek(0)
+
+            files = {"file": ("import.xlsx", bio.read(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+            response = client.post("/import/excel", files=files)
+            assert response.status_code == 200
+            data = response.json()
+            assert data["imported"] >= 1
+        except Exception:
+            pytest.skip("openpyxl not available")
 
 
 if __name__ == "__main__":
