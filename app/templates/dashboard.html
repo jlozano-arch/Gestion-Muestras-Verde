@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Gestión de Muestras{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <h2>Dashboard</h2>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>{{ total_samples }}</h3>
+            <p>Total de Muestras</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ available_samples }}</h3>
+            <p>Muestras Disponibles</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ total_quantity }} kg</h3>
+            <p>Cantidad Disponible</p>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="dashboard-section">
+            <h3>Muestras Recientes</h3>
+            {% if recent_samples %}
+                <ul class="sample-list">
+                {% for sample in recent_samples %}
+                    <li>
+                        <a href="/samples/{{ sample.id }}">
+                            <strong>{{ sample.code }}</strong>
+                            <span>{{ sample.country_name }} - {{ sample.origin }}</span>
+                            <small>{{ sample.available_quantity }} kg disponibles</small>
+                        </a>
+                    </li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <p class="empty">No hay muestras registradas</p>
+            {% endif %}
+        </div>
+
+        <div class="dashboard-section">
+            <h3>Mejor Puntuación (Indian Score)</h3>
+            {% if high_score_samples %}
+                <ul class="sample-list">
+                {% for sample in high_score_samples %}
+                    <li>
+                        <a href="/samples/{{ sample.id }}">
+                            <strong>{{ sample.code }}</strong>
+                            <span>{{ sample.country_name }} - {{ sample.origin }}</span>
+                            <small>Puntuación excelente</small>
+                        </a>
+                    </li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <p class="empty">Sin evaluaciones aún</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="action-buttons">
+        <a href="/samples/new" class="btn btn-primary">+ Nueva Muestra</a>
+        <a href="/samples" class="btn btn-secondary">Ver Todas las Muestras</a>
+        <a href="/compare" class="btn btn-secondary">Comparador</a>
+    </div>
+</div>
+{% endblock %}

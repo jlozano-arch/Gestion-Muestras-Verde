@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Muestras - Gestión de Café Verde{% endblock %}
+
+{% block content %}
+<div class="samples-view">
+    <h2>Muestras de Café Verde</h2>
+
+    <div class="filters">
+        <form method="get" class="filter-form">
+            <select name="status" onchange="this.form.submit()">
+                <option value="">Todos los estados</option>
+                {% for s in statuses %}
+                    <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+            </select>
+            
+            <select name="country" onchange="this.form.submit()">
+                <option value="">Todos los países</option>
+                {% for code, country in countries.items() %}
+                    <option value="{{ code }}">{{ country.flag }} {{ country.name }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+
+    {% if samples %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>País</th>
+                    <th>Origen</th>
+                    <th>Variedad</th>
+                    <th>Disponible</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sample in samples %}
+                <tr>
+                    <td><strong>{{ sample.code }}</strong></td>
+                    <td>{{ sample.country_name }}</td>
+                    <td>{{ sample.origin }}</td>
+                    <td>{{ sample.variety }}</td>
+                    <td>{{ sample.available_quantity }} kg</td>
+                    <td><span class="status-badge status-{{ sample.status }}">{{ sample.status }}</span></td>
+                    <td>
+                        <a href="/samples/{{ sample.id }}" class="btn btn-small">Detalle</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="empty">No hay muestras con estos filtros</p>
+    {% endif %}
+
+    <div class="action-buttons">
+        <a href="/samples/new" class="btn btn-primary">+ Nueva Muestra</a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+<form id="shipment-form-element" method="post" action="/samples/{{ sample.id }}/shipments" class="shipment-form">
+    <h4>Registrar Envío</h4>
+
+    <div class="form-group">
+        <label>Cantidad Disponible: {{ sample.available_quantity }} kg</label>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Cantidad a Enviar (kg) *</label>
+            <input type="number" name="quantity" required step="0.1" min="0" max="{{ sample.available_quantity }}" placeholder="Ej: 50">
+        </div>
+        <div class="form-group">
+            <label>Referencia de Envío *</label>
+            <input type="text" name="reference" required placeholder="Ej: SHIP-2025-001">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>Destino *</label>
+        <input type="text" name="destination" required placeholder="Ciudad, País">
+    </div>
+
+    <div class="form-group">
+        <label>Notas</label>
+        <textarea name="notes" rows="3" placeholder="Observaciones sobre el envío..."></textarea>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Registrar Envío</button>
+        <button type="button" onclick="document.getElementById('shipment-form').style.display='none'" class="btn btn-secondary">Cancelar</button>
+    </div>
+</form>
+
+<script>
+    document.getElementById('shipment-form-element').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const response = await fetch(e.target.action, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            location.reload();
+        } else {
+            const data = await response.json();
+            alert('Error: ' + data.detail);
+        }
+    });
+</script>

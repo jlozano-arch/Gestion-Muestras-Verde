@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Nueva Muestra{% endblock %}
+
+{% block content %}
+<div class="form-view">
+    <h2>Registrar Nueva Muestra</h2>
+
+    <form method="post" action="/samples" class="sample-form">
+        <fieldset>
+            <legend>Información Básica</legend>
+            
+            <div class="form-group">
+                <label>Código de Muestra *</label>
+                <input type="text" name="code" required placeholder="Ej: CO-HUILA-001">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>País Origen *</label>
+                    <select name="country_code" required>
+                        <option value="">Seleccionar...</option>
+                        {% for code, country in countries.items() %}
+                            <option value="{{ code }}">{{ country.flag }} {{ country.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Región/Origen *</label>
+                    <input type="text" name="origin" required placeholder="Ej: Huila">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Productor *</label>
+                    <input type="text" name="producer" required placeholder="Nombre del productor">
+                </div>
+
+                <div class="form-group">
+                    <label>Variedad *</label>
+                    <input type="text" name="variety" required placeholder="Ej: Geisha, Bourbon, Typica">
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Datos Técnicos</legend>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Fecha de Cosecha *</label>
+                    <input type="text" name="harvest_date" required placeholder="Ej: 2025-12">
+                </div>
+
+                <div class="form-group">
+                    <label>Altitud (m.s.n.m.)</label>
+                    <input type="number" name="altitude" placeholder="Ej: 1800">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Método de Procesamiento *</label>
+                    <select name="processing" required>
+                        <option value="">Seleccionar...</option>
+                        {% for method in processing_methods %}
+                            <option value="{{ method }}">{{ method }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Cantidad Inicial (kg) *</label>
+                    <input type="number" name="initial_quantity" required step="0.1" min="0" placeholder="Ej: 500">
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Notas</legend>
+            <div class="form-group">
+                <label>Observaciones</label>
+                <textarea name="notes" rows="4" placeholder="Observaciones iniciales..."></textarea>
+            </div>
+        </fieldset>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Registrar Muestra</button>
+            <a href="/samples" class="btn btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.querySelector('.sample-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const response = await fetch('/samples', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            window.location.href = '/samples/' + data.id;
+        } else {
+            alert('Error al registrar la muestra');
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Comparador de Muestras{% endblock %}
+
+{% block content %}
+<div class="compare-view">
+    <h2>Comparador de Muestras</h2>
+
+    <div class="compare-selector">
+        <form id="compare-form">
+            <label>Selecciona muestras para comparar:</label>
+            <select id="sample-select" multiple size="10">
+                {% for sample in all_samples %}
+                    <option value="{{ sample.id }}">
+                        {{ sample.code }} - {{ sample.country_name }} - {{ sample.origin }}
+                    </option>
+                {% endfor %}
+            </select>
+            <button type="button" onclick="updateComparison()" class="btn btn-primary">Comparar</button>
+        </form>
+    </div>
+
+    {% if samples %}
+    <div class="comparison-table">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Característica</th>
+                    {% for sample in samples %}
+                    <th>{{ sample.code }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>País</strong></td>
+                    {% for sample in samples %}
+                    <td>{{ sample.country_name }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Origen</strong></td>
+                    {% for sample in samples %}
+                    <td>{{ sample.origin }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Variedad</strong></td>
+                    {% for sample in samples %}
+                    <td>{{ sample.variety }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Disponible</strong></td>
+                    {% for sample in samples %}
+                    <td>{{ sample.available_quantity }} kg</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Procesamiento</strong></td>
+                    {% for sample in samples %}
+                    <td>{{ sample.processing }}</td>
+                    {% endfor %}
+                </tr>
+                
+                {% if tastings %}
+                <tr class="comparison-scores">
+                    <td><strong>Indian Score</strong></td>
+                    {% for sample in samples %}
+                    <td class="score-cell">
+                        {% if tastings[sample.id] %}
+                            <span class="score">{{ "%.1f"|format(tastings[sample.id].indian_score) }}</span>
+                        {% else %}
+                            <span class="no-data">-</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Puntuación de Taza</strong></td>
+                    {% for sample in samples %}
+                    <td>
+                        {% if tastings[sample.id] %}
+                            {{ "%.1f"|format(tastings[sample.id].cup_score) }}
+                        {% else %}
+                            <span class="no-data">-</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Viabilidad Comercial</strong></td>
+                    {% for sample in samples %}
+                    <td>
+                        {% if tastings[sample.id] %}
+                            {{ "%.1f"|format(tastings[sample.id].commercial_score) }}
+                        {% else %}
+                            <span class="no-data">-</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Criba 18+</strong></td>
+                    {% for sample in samples %}
+                    <td>
+                        {% if tastings[sample.id] %}
+                            {{ "%.1f"|format(tastings[sample.id].sieve_18) }}%
+                        {% else %}
+                            <span class="no-data">-</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Humedad</strong></td>
+                    {% for sample in samples %}
+                    <td>
+                        {% if tastings[sample.id] %}
+                            {{ "%.1f"|format(tastings[sample.id].humidity) }}%
+                        {% else %}
+                            <span class="no-data">-</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updateComparison() {
+    const select = document.getElementById('sample-select');
+    const selected = Array.from(select.selectedOptions).map(o => o.value).join(',');
+    if (selected) {
+        window.location.href = '/compare?ids=' + selected;
+    }
+}
+</script>
+{% endblock %}
