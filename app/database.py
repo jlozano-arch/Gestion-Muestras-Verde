@@ -60,5 +60,16 @@ def create_tables():
                         conn.execute(f"ALTER TABLE samples ADD COLUMN {col} {coltype}")
                     except Exception:
                         pass
+            # Ensure documents table has tasting_id column for tasting-specific docs
+            try:
+                res2 = conn.execute("PRAGMA table_info('documents')")
+                existing_docs = {row[1] for row in res2.fetchall()}
+                if 'tasting_id' not in existing_docs:
+                    try:
+                        conn.execute("ALTER TABLE documents ADD COLUMN tasting_id INTEGER")
+                    except Exception:
+                        pass
+            except Exception:
+                pass
     except Exception:
         pass

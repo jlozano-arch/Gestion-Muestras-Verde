@@ -120,6 +120,42 @@
                     {% if tasting.recommendations %}
                     <div class="tasting-recommendations"><strong>Recomendaciones:</strong><p>{{ tasting.recommendations }}</p></div>
                     {% endif %}
+                    <div class="tasting-actions">
+                        <a class="btn btn-secondary" href="/samples/{{ sample.id }}/tastings/{{ tasting.id }}/pdf" target="_blank"><i class="fa-solid fa-file-pdf"></i> Ficha de cata PDF</a>
+                    </div>
+                    <div class="tasting-docs">
+                        <h5>Galería de cata</h5>
+                        <div class="documents-grid">
+                            {% set tasting_docs = [] %}
+                            {% for doc in documents %}
+                                {% if doc.tasting_id == tasting.id %}
+                                    {% set _ = tasting_docs.append(doc) %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if tasting_docs %}
+                                {% for doc in tasting_docs %}
+                                <div class="document-card gallery-card">
+                                    <div class="gallery-thumb">
+                                        {% if doc.file_type and doc.file_type.startswith('image') %}
+                                            <img src="/uploads/samples/{{ sample.id }}/tastings/{{ doc.file_path.split('/')[-1] }}" alt="{{ doc.file_name }}" />
+                                        {% else %}
+                                            <i class="fa-solid fa-file-lines"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <p class="doc-name"><a href="/uploads/samples/{{ sample.id }}/tastings/{{ doc.file_path.split('/')[-1] }}" target="_blank">{{ doc.file_name }}</a></p>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="empty">No hay fotos para esta cata</p>
+                            {% endif %}
+                        </div>
+                        <form method="post" action="/samples/{{ sample.id }}/tastings/{{ tasting.id }}/documents" enctype="multipart/form-data" class="upload-form">
+                            <div class="form-row"><div class="form-group"><label>Subir foto/certificado</label><input type="file" name="file" required></div><div class="form-group"><label>Tipo</label><input type="text" name="document_type" placeholder="cafe_verde, cafe_tostado, molido, ficha"></div></div>
+                            <div class="form-actions"><button class="btn btn-primary" type="submit">Subir a la cata</button></div>
+                        </form>
+                    </div>
                 </div>
                 {% endfor %}
             {% else %}

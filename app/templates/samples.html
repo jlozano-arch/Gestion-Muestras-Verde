@@ -10,7 +10,8 @@
         <p class="lead">Filtra y explora tus lotes de café verde rápidamente, con métricas claras y acciones directas en un solo lugar.</p>
     </div>
     <div class="page-actions">
-        <a href="/samples/new" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Nueva muestra</a>
+           <a href="/samples/new" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Nueva muestra</a>
+           <a href="#" id="print-selected" class="btn btn-secondary"><i class="fa-solid fa-print"></i> Imprimir etiqueta</a>
     </div>
 </div>
 
@@ -39,6 +40,16 @@
 
 <div class="card">
     <div class="card-header">
+            {% block extra_js %}
+            <script>
+            document.querySelectorAll('.label-check');
+            document.getElementById('print-selected').addEventListener('click', () => {
+                const ids = Array.from(document.querySelectorAll('.label-check:checked')).map(c => c.value);
+                if (!ids.length) return alert('Selecciona al menos una muestra');
+                ids.forEach(id => window.open(`/samples/${id}/label`, '_blank'));
+            });
+            </script>
+            {% endblock %}
         <h3>Muestras</h3>
     </div>
     <div class="card-body">
@@ -59,7 +70,7 @@
                 <tbody>
                     {% for sample in samples %}
                     <tr>
-                        <td><strong>{{ sample.code }}</strong></td>
+                    <td><input type="checkbox" class="label-check" value="{{ sample.id }}"> <a href="/samples/{{ sample.id }}">{{ sample.code }}</a></td>
                         <td>{{ sample.country_name }}</td>
                         <td>{{ sample.origin }}</td>
                         <td>{{ sample.variety }}</td>

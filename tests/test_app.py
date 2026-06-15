@@ -207,6 +207,50 @@ class TestTastings:
         assert "id" in data
         assert "indian_score" in data
 
+    def test_tasting_associated_and_pdf_and_docs(self):
+        # Create sample
+        response = client.post("/samples", data={
+            "code": "TASTE-TEST-001",
+            "country_code": "CO",
+            "origin": "Huila",
+            "producer": "Test Producer",
+            "harvest_date": "2025-11",
+            "variety": "Geisha",
+            "altitude": 1800,
+            "processing": "Washed",
+            "initial_quantity": 20.0,
+        })
+        sample_id = response.json()["id"]
+
+        # Create tasting
+        response = client.post(f"/samples/{sample_id}/tastings", data={
+            "evaluator": "Miguel",
+            "sieve_18": 60.0,
+            "sieve_16": 30.0,
+            "sieve_14": 10.0,
+            "humidity": 11.0,
+            "defects_primary": 1,
+            "defects_secondary": 0,
+            "aroma": 8,
+            "acidity": 8,
+            "body": 8,
+            "flavor": 8,
+            "aftertaste": 8,
+            "cleanliness": 8,
+            "balance": 8,
+        })
+        tasting_id = response.json()["id"]
+
+        # Upload tasting document
+        files = {"file": ("t.jpg", b"1234", "image/jpeg")}
+        resp = client.post(f"/samples/{sample_id}/tastings/{tasting_id}/documents", files=files)
+        assert resp.status_code in (200, 303)
+
+        # Get tasting PDF
+        resp = client.get(f"/samples/{sample_id}/tastings/{tasting_id}/pdf")
+        assert resp.status_code == 200
+        assert resp.headers.get('content-type') == 'application/pdf'
+
 
 class TestShipments:
     """Shipment tests"""

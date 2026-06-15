@@ -260,6 +260,95 @@ async def sample_detail(
     })
 
 
+@app.post("/samples/{sample_id}/tastings/{tasting_id}/documents")
+async def upload_tasting_document(sample_id: int, tasting_id: int, file: UploadFile = File(...), document_type: str = Form(None), db: Session = Depends(get_db)):
+    sample = db.query(Sample).filter(Sample.id == sample_id).first()
+    tasting = db.query(Tasting).filter(Tasting.id == tasting_id, Tasting.sample_id == sample_id).first()
+    if not sample or not tasting:
+        raise HTTPException(status_code=404, detail="Sample or tasting not found")
+
+    upload_dir = os.path.join("uploads", "samples", str(sample_id), "tastings", str(tasting_id))
+    os.makedirs(upload_dir, exist_ok=True)
+    filename = os.path.basename(file.filename)
+    safe_name = f"{int(datetime.utcnow().timestamp())}_{filename}"
+    save_path = os.path.join(upload_dir, safe_name)
+
+    with open(save_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    doc = Document(sample_id=sample.id, tasting_id=tasting.id, file_name=filename, file_path=save_path, file_type=document_type or file.content_type)
+    db.add(doc)
+    db.commit()
+
+    return RedirectResponse(f"/samples/{sample_id}", status_code=303)
+
+
+@app.get("/samples/{sample_id}/tastings/{tasting_id}/pdf")
+async def tasting_pdf(sample_id: int, tasting_id: int, db: Session = Depends(get_db)):
+    sample = db.query(Sample).filter(Sample.id == sample_id).first()
+    tasting = db.query(Tasting).filter(Tasting.id == tasting_id, Tasting.sample_id == sample_id).first()
+    if not sample or not tasting:
+        raise HTTPException(status_code=404, detail="Sample or tasting not found")
+
+    # create PDF with sample + tasting info and include tasting images if any
+    docs = db.query(Document).filter(Document.tasting_id == tasting_id).all()
+
+    pdf_buffer = io.BytesIO()
+    c = canvas.Canvas(pdf_buffer, pagesize=letter)
+    width, height = letter
+
+    # Header with logo
+    try:
+        logo_path = Path(__file__).parent / "static" / "logo.png"
+        if logo_path.exists():
+            c.drawImage(ImageReader(str(logo_path)), 10*mm, height - 30*mm, width=40*mm, height=15*mm, preserveAspectRatio=True, mask='auto')
+    except Exception:
+        pass
+
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(10*mm, height - 40*mm, f"Ficha de cata - {sample.code}")
+    c.setFont("Helvetica", 10)
+    c.drawString(10*mm, height - 50*mm, f"Proveedor: {sample.producer or '-'} | Ref: {sample.supplier_reference or '-'} | CVC: {sample.purchase_contract_cvc or '-'}")
+
+    # Tasting details
+    y = height - 65*mm
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(10*mm, y, f"Cata por: {tasting.evaluator}")
+    y -= 6*mm
+    c.setFont("Helvetica", 9)
+    c.drawString(10*mm, y, f"Fecha: {tasting.tasting_date.strftime('%Y-%m-%d')}")
+    y -= 6*mm
+    c.drawString(10*mm, y, f"Humedad: {tasting.humidity}%  Cribas: 18+ {tasting.sieve_18}% 16+ {tasting.sieve_16}% 14+ {tasting.sieve_14}%")
+    y -= 6*mm
+    c.drawString(10*mm, y, f"Defectos (prim/seg): {tasting.defects_primary}/{tasting.defects_secondary}")
+    y -= 6*mm
+    c.drawString(10*mm, y, f"Indian Score: {tasting.indian_score:.1f}  Cup Score: {tasting.cup_score:.1f}  Comercial: {tasting.commercial_score:.1f}")
+    y -= 8*mm
+    if tasting.tasting_notes:
+        c.drawString(10*mm, y, "Notas:")
+        y -= 5*mm
+        text = c.beginText(10*mm, y)
+        text.setFont("Helvetica", 8)
+        for line in (tasting.tasting_notes or "").splitlines():
+            text.textLine(line)
+            y -= 4*mm
+        c.drawText(text)
+
+    # Images: include up to 4 thumbnails
+    img_x = 10*mm
+    img_y = y - 10*mm
+    for doc in docs[:4]:
+        try:
+            c.drawImage(ImageReader(doc.file_path), img_x, img_y, width=45*mm, height=30*mm, preserveAspectRatio=True, mask='auto')
+            img_x += 50*mm
+        except Exception:
+            continue
+
+    c.save()
+    pdf_buffer.seek(0)
+    return FileResponse(pdf_buffer, media_type="application/pdf", filename=f"ficha_cata_{sample.code}_{tasting_id}.pdf")
+
+
 @app.post("/samples/{sample_id}/documents")
 async def upload_document(sample_id: int, file: UploadFile = File(...), document_type: str = Form(None), db: Session = Depends(get_db)):
     """Upload a document or photo for a sample"""
@@ -555,6 +644,12 @@ async def compare_samples(
         "tastings": tastings,
         "all_samples": db.query(Sample).all(),
     })
+
+
+@app.get('/labels', response_class=HTMLResponse)
+async def labels_page(request: Request, db: Session = Depends(get_db)):
+    samples = db.query(Sample).order_by(desc(Sample.created_at)).all()
+    return templates.TemplateResponse('labels.html', {"request": request, "all_samples": samples})
 
 
 # ============================================================================

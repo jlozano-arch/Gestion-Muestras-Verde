@@ -127,6 +127,7 @@ class Event(Base):
     id = Column(Integer, primary_key=True, index=True)
     sample_id = Column(Integer, ForeignKey("samples.id"), index=True)
     event_type = Column(String(50))  # received, tasted, shipped, archived, etc.
+    tasting_id = Column(Integer, ForeignKey("tastings.id"), index=True, nullable=True)
     description = Column(String(500))
     event_date = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, server_default=func.now())
@@ -135,6 +136,7 @@ class Event(Base):
     sample = relationship("Sample", back_populates="events")
 
 
+    tasting = relationship("Tasting", backref="documents")
 class Document(Base):
     """Document/photo storage"""
     __tablename__ = "documents"

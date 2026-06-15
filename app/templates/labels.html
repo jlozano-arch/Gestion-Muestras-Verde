@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Imprimir Etiquetas{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <span class="eyebrow"><i class="fa-solid fa-tag"></i> Etiquetas</span>
+        <h2>Generar etiquetas</h2>
+        <p class="lead">Selecciona una o varias muestras y pulsa generar para abrir las etiquetas en nuevas pestañas.</p>
+    </div>
+</div>
+
+<div class="card">
+    <form id="labels-form">
+        <div class="table-responsive">
+            <table class="table">
+                <thead><tr><th></th><th>Código</th><th>Origen</th><th>Productor</th><th>Disponibles</th></tr></thead>
+                <tbody>
+                {% for s in all_samples %}
+                <tr>
+                    <td><input type="checkbox" name="ids" value="{{ s.id }}"></td>
+                    <td>{{ s.code }}</td>
+                    <td>{{ s.origin }}</td>
+                    <td>{{ s.producer }}</td>
+                    <td>{{ s.available_quantity }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="form-actions">
+            <button type="button" id="generate-labels" class="btn btn-primary">Generar etiquetas</button>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('generate-labels').addEventListener('click', () => {
+    const ids = Array.from(document.querySelectorAll('input[name="ids"]:checked')).map(c => c.value);
+    if (!ids.length) return alert('Selecciona al menos una muestra');
+    ids.forEach(id => window.open(`/samples/${id}/label`, '_blank'));
+});
+</script>
+{% endblock %}
