@@ -22,7 +22,7 @@
             <select name="status" onchange="this.form.submit()">
                 <option value="">Todos los estados</option>
                 {% for s in statuses %}
-                    <option value="{{ s }}">{{ s }}</option>
+                    <option value="{{ s.value }}">{{ s.label }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -75,7 +75,7 @@
                         <td>{{ sample.origin }}</td>
                         <td>{{ sample.variety }}</td>
                         <td>{{ sample.available_quantity_g }} g</td>
-                        <td><span class="status-badge status-{{ sample.status|lower|replace(' ', '-') }}">{{ sample.status }}</span></td>
+                        <td><span class="status-badge status-{{ sample.status.value|lower|replace(' ', '-') }}">{{ status_label(sample.status.value) }}</span></td>
                         <td><a href="/samples/{{ sample.id }}" class="btn btn-small btn-secondary"><i class="fa-solid fa-arrow-right"></i> Detalle</a></td>
                     </tr>
                     {% endfor %}

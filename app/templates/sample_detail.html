@@ -27,7 +27,7 @@
             </div>
         </div>
         <div class="sample-meta">
-            <span class="status-badge status-{{ sample.status|lower|replace(' ', '-') }}">{{ sample.status }}</span>
+            <span class="status-badge status-{{ sample.status.value|lower|replace(' ', '-') }}">{{ status_label(sample.status.value) }}</span>
             <div class="sample-summary">
                 <div>
                     <span class="summary-label">Disponibles</span>
@@ -48,7 +48,7 @@
         </div>
         <div class="metric-card">
             <span class="metric-label">Estado actual</span>
-            <strong>{{ sample.status }}</strong>
+            <strong>{{ status_label(sample.status.value) }}</strong>
         </div>
     </div>
 

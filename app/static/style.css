@@ -77,6 +77,12 @@ button, input, select, textarea {
     gap: 1rem;
 }
 
+.brand-logo {
+    max-height: 48px;
+    width: auto;
+    display: block;
+}
+
 .brand-mark {
     width: 48px;
     height: 48px;
@@ -106,6 +112,9 @@ button, input, select, textarea {
     align-items: center;
     gap: 1rem;
     flex-wrap: wrap;
+    list-style: none;
+    margin: 0;
+    padding: 0;
 }
 
 .topbar-link {
@@ -215,6 +224,25 @@ button, input, select, textarea {
 .page-grid {
     display: grid;
     gap: 1.5rem;
+}
+
+.page-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.chart-panel {
+    min-height: 260px;
+}
+
+.chart-wrapper {
+    padding: 1rem 1.75rem 1.75rem;
+    min-height: 260px;
+}
+
+.chart-wrapper canvas {
+    width: 100% !important;
+    height: 240px !important;
+    max-height: 240px !important;
 }
 
 .stats-grid {

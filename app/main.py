@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 import qrcode
 import io
-from reportlab.lib.pagesizes import letter, A6
+from reportlab.lib.pagesizes import letter, A6, A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
@@ -46,6 +46,25 @@ app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 # Setup templates
 templates_path = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(templates_path))
+
+STATUS_LABELS = {
+    "received": "Recibida",
+    "analyzing": "En cata",
+    "evaluated": "Evaluada",
+    "available": "Disponible",
+    "partially_shipped": "Parcialmente enviada",
+    "shipped": "Enviada",
+    "archived": "Archivada",
+}
+
+
+def status_label(status: str) -> str:
+    return STATUS_LABELS.get(status, status.replace('_', ' ').title())
+
+logo_exists = (Path(__file__).parent / "static" / "logo.png").exists()
+
+templates.env.globals["status_label"] = status_label
+templates.env.globals["logo_exists"] = logo_exists
 
 
 @app.on_event("startup")
@@ -145,7 +164,7 @@ async def list_samples(
         "request": request,
         "samples": samples,
         "countries": get_all_countries(),
-        "statuses": [s.value for s in SampleStatus],
+        "statuses": [{"value": s.value, "label": status_label(s.value)} for s in SampleStatus],
     })
 
 
@@ -455,59 +474,124 @@ async def tasting_pdf(sample_id: int, tasting_id: int, request: Request, db: Ses
     if not sample or not tasting:
         raise HTTPException(status_code=404, detail="Sample or tasting not found")
 
-    # create PDF with sample + tasting info and include tasting images if any
     docs = db.query(Document).filter(Document.tasting_id == tasting_id).all()
+    sample_docs = db.query(Document).filter(Document.sample_id == sample_id, Document.tasting_id == None).all()
 
     pdf_buffer = io.BytesIO()
-    c = canvas.Canvas(pdf_buffer, pagesize=letter)
-    width, height = letter
+    c = canvas.Canvas(pdf_buffer, pagesize=A4)
+    width, height = A4
+    margin = 15 * mm
 
     # Header with logo
     try:
         logo_path = Path(__file__).parent / "static" / "logo.png"
         if logo_path.exists():
-            c.drawImage(ImageReader(str(logo_path)), 10*mm, height - 30*mm, width=40*mm, height=15*mm, preserveAspectRatio=True, mask='auto')
+            c.drawImage(ImageReader(str(logo_path)), margin, height - 35*mm, width=45*mm, height=20*mm, preserveAspectRatio=True, mask='auto')
     except Exception:
         pass
 
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(10*mm, height - 40*mm, f"Ficha de cata - {sample.code}")
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(margin + 50*mm, height - 28*mm, "Ficha de cata")
     c.setFont("Helvetica", 10)
-    c.drawString(10*mm, height - 50*mm, f"Proveedor: {sample.producer or '-'} | Ref: {sample.supplier_reference or '-'} | CVC: {sample.purchase_contract_cvc or '-'}")
+    c.drawString(margin + 50*mm, height - 35*mm, f"Muestra: {sample.code}")
 
-    # Tasting details
-    y = height - 65*mm
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(10*mm, y, f"Cata por: {tasting.evaluator}")
+    # Sample information
+    y = height - 45*mm
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, y, "Datos de la muestra")
     y -= 6*mm
     c.setFont("Helvetica", 9)
-    c.drawString(10*mm, y, f"Fecha: {tasting.tasting_date.strftime('%Y-%m-%d')}")
-    y -= 6*mm
-    c.drawString(10*mm, y, f"Humedad: {tasting.humidity}%  Cribas: 18+ {tasting.sieve_18}% 16+ {tasting.sieve_16}% 14+ {tasting.sieve_14}%")
-    y -= 6*mm
-    c.drawString(10*mm, y, f"Defectos (prim/seg): {tasting.defects_primary}/{tasting.defects_secondary}")
-    y -= 6*mm
-    c.drawString(10*mm, y, f"Indian Score: {tasting.indian_score:.1f}  Cup Score: {tasting.cup_score:.1f}  Comercial: {tasting.commercial_score:.1f}")
-    y -= 8*mm
-    if tasting.tasting_notes:
-        c.drawString(10*mm, y, "Notas:")
+    c.drawString(margin, y, f"Origen: {sample.origin or '-'}")
+    y -= 5*mm
+    c.drawString(margin, y, f"País: {sample.country_name or '-'}")
+    y -= 5*mm
+    c.drawString(margin, y, f"Calidad: {sample.quality or '-'}")
+    y -= 5*mm
+    c.drawString(margin, y, f"Proveedor: {sample.producer or '-'}")
+    y -= 5*mm
+    c.drawString(margin, y, f"Ref. proveedor: {sample.supplier_reference or '-'}")
+    y -= 5*mm
+    if sample.purchase_contract_cvc:
+        c.drawString(margin, y, f"CVC: {sample.purchase_contract_cvc}")
         y -= 5*mm
-        text = c.beginText(10*mm, y)
-        text.setFont("Helvetica", 8)
-        for line in (tasting.tasting_notes or "").splitlines():
-            text.textLine(line)
-            y -= 4*mm
-        c.drawText(text)
 
-    # Images: include up to 4 thumbnails
-    img_x = 10*mm
-    img_y = y - 10*mm
-    for doc in docs[:4]:
+    # Tasting physical data
+    y -= 4*mm
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, y, "Datos físicos de cata")
+    y -= 6*mm
+    c.setFont("Helvetica", 9)
+    c.drawString(margin, y, f"Fecha: {tasting.tasting_date.strftime('%Y-%m-%d')}")
+    y -= 5*mm
+    if tasting.roast_date:
+        c.drawString(margin, y, f"Fecha tostado: {tasting.roast_date.strftime('%Y-%m-%d')}")
+        y -= 5*mm
+    c.drawString(margin, y, f"Humedad: {tasting.humidity or 0:.1f}%")
+    y -= 5*mm
+    c.drawString(margin, y, f"Criba 18+: {tasting.sieve_18 or 0:.1f}%  16+: {tasting.sieve_16 or 0:.1f}%")
+    y -= 5*mm
+    c.drawString(margin, y, f"14+: {tasting.sieve_14 or 0:.1f}%")
+    y -= 5*mm
+    c.drawString(margin, y, f"Defectos prim./sec.: {tasting.defects_primary or 0}/{tasting.defects_secondary or 0}")
+
+    # Sensory data
+    y -= 8*mm
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, y, "Datos sensoriales")
+    y -= 6*mm
+    c.setFont("Helvetica", 9)
+    c.drawString(margin, y, f"Aroma: {tasting.aroma or 0}  Acidez: {tasting.acidity or 0}  Cuerpo: {tasting.body or 0}")
+    y -= 5*mm
+    c.drawString(margin, y, f"Sabor: {tasting.flavor or 0}  Postgusto: {tasting.aftertaste or 0}  Limpieza: {tasting.cleanliness or 0}")
+    y -= 5*mm
+    c.drawString(margin, y, f"Balance: {tasting.balance or 0}  Cup Score: {tasting.cup_score or 0:.1f}  Indian: {tasting.indian_score or 0:.1f}")
+    y -= 8*mm
+
+    # Notes
+    if tasting.tasting_notes:
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, y, "Notas")
+        y -= 6*mm
+        c.setFont("Helvetica", 9)
+        text = c.beginText(margin, y)
+        text.setLeading(10)
+        for line in tasting.tasting_notes.splitlines():
+            text.textLine(line)
+        c.drawText(text)
+        y = text.getY() - 8*mm
+    else:
+        y -= 4*mm
+
+    # Photos
+    photos = [doc for doc in docs if doc.document_type and ('verde' in doc.document_type.lower() or 'green' in doc.document_type.lower())]
+    roast_photos = [doc for doc in docs if doc.document_type and ('tostado' in doc.document_type.lower() or 'roasted' in doc.document_type.lower())]
+    if not photos or not roast_photos:
+        fallback = [doc for doc in sample_docs if doc.file_type and doc.file_type.startswith('image')]
+        if photos == [] and fallback:
+            photos = [fallback[0]]
+        if roast_photos == [] and len(fallback) > 1:
+            roast_photos = [fallback[1]]
+
+    img_width = (width - margin * 2 - 10*mm) / 2
+    img_height = 70*mm
+    row_y = margin + img_height
+    x_left = margin
+    x_right = margin + img_width + 10*mm
+
+    if photos:
         try:
-            c.drawImage(ImageReader(doc.file_path), img_x, img_y, width=45*mm, height=30*mm, preserveAspectRatio=True, mask='auto')
-            img_x += 50*mm
+            c.drawImage(ImageReader(photos[0].file_path), x_left, margin, width=img_width, height=img_height, preserveAspectRatio=True, anchor='sw')
+            c.setFont("Helvetica-Bold", 9)
+            c.drawString(x_left, margin + img_height + 2*mm, "Café verde")
         except Exception:
-            continue
+            pass
+    if roast_photos:
+        try:
+            c.drawImage(ImageReader(roast_photos[0].file_path), x_right, margin, width=img_width, height=img_height, preserveAspectRatio=True, anchor='sw')
+            c.setFont("Helvetica-Bold", 9)
+            c.drawString(x_right, margin + img_height + 2*mm, "Café tostado")
+        except Exception:
+            pass
 
     c.save()
     pdf_buffer.seek(0)
@@ -740,12 +824,7 @@ async def generate_label(sample_id: int, request: Request, db: Session = Depends
     sample = db.query(Sample).filter(Sample.id == sample_id).first()
     if not sample:
         raise HTTPException(status_code=404, detail="Muestra no encontrada")
-    
-    best_tasting = db.query(Tasting).filter(
-        Tasting.sample_id == sample_id
-    ).order_by(desc(Tasting.indian_score)).first()
-    
-    # Generate QR code pointing to the sample detail (use APP_BASE_URL if set)
+
     base = os.getenv('APP_BASE_URL')
     if not base:
         base = str(request.base_url)
@@ -753,104 +832,67 @@ async def generate_label(sample_id: int, request: Request, db: Session = Depends
     qr = qrcode.QRCode(version=1, box_size=4, border=1)
     qr.add_data(qr_data)
     qr.make(fit=True)
-    
     qr_img = qr.make_image(fill_color="black", back_color="white")
-    
-    # Create PDF
-    pdf_buffer = io.BytesIO()
-    c = canvas.Canvas(pdf_buffer, pagesize=A6)
-    
-    # Dimensions
-    width, height = A6
-    margin = 5*mm
 
-    # TOP BAND: Country flag and band (using colors)
-    # For now, we'll draw a colored band with country name
-    band_height = 12*mm
-    
-    # Simple color mapping for countries (can be expanded)
+    pdf_buffer = io.BytesIO()
+    page_width = 89 * mm
+    page_height = 62 * mm
+    c = canvas.Canvas(pdf_buffer, pagesize=(page_width, page_height))
+    margin = 5 * mm
+
+    band_height = 10 * mm
     country_colors = {
-        'PE': HexColor('#DC143C'),  # Peru - Red
-        'CO': HexColor('#FCD116'),  # Colombia - Yellow
-        'BR': HexColor('#009B3A'),  # Brazil - Green
-        'EC': HexColor('#F4D03F'),  # Ecuador - Yellow
-        'BO': HexColor('#F4D03F'),  # Bolivia - Yellow
+        'PE': HexColor('#DC143C'),
+        'CO': HexColor('#FCD116'),
+        'BR': HexColor('#009B3A'),
+        'EC': HexColor('#F4D03F'),
+        'BO': HexColor('#F4D03F'),
     }
-    
-    band_color = country_colors.get(sample.country_code, HexColor('#CCCCCC'))
+    band_color = country_colors.get(sample.country_code, HexColor('#444444'))
     c.setFillColor(band_color)
-    c.rect(0, height - band_height, width, band_height, fill=1, stroke=0)
-    
-    # White text on colored band
+    c.rect(0, page_height - band_height, page_width, band_height, fill=1, stroke=0)
+
     c.setFillColor(HexColor('#FFFFFF'))
-    c.setFont("Helvetica-Bold", 10)
-    flag = get_country_flag(sample.country_code) if sample.country_code else '🌍'
-    c.drawString(margin, height - band_height + 2*mm, f"{flag} {sample.country_name or 'Unknown'}")
-    
-    # CONTENT AREA
-    y_pos = height - band_height - margin
-    
-    # Company header
-    c.setFillColor(HexColor('#000000'))
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(margin, y_pos, "INDIAN ECOTRADE")
-    y_pos -= 4*mm
-    
-    # Divider line
-    c.setLineWidth(0.5)
-    c.line(margin, y_pos + 1*mm, width - margin, y_pos + 1*mm)
-    y_pos -= 2*mm
-    
-    # MAIN INFO SECTION (Center column)
-    c.setFont("Helvetica", 7)
-    
-    # Quality
-    c.setFont("Helvetica-Bold", 8)
-    c.drawString(margin, y_pos, f"CALIDAD: {sample.quality or '-'}")
-    y_pos -= 4*mm
-    
-    # Producer
-    c.setFont("Helvetica", 7)
-    c.drawString(margin, y_pos, f"Proveedor: {sample.producer or '-'}")
-    y_pos -= 3.5*mm
-    
-    # Supplier reference
-    c.drawString(margin, y_pos, f"Ref. proveedor: {sample.supplier_reference or '-'}")
-    y_pos -= 3.5*mm
-    
-    # Sample code
-    c.setFont("Helvetica-Bold", 8)
-    c.drawString(margin, y_pos, f"CÓDIGO: {sample.code}")
-    y_pos -= 4*mm
-    
-    # CVC (if exists)
+    flag = get_country_flag(sample.country_code) if sample.country_code else '🌍'
+    c.drawString(margin, page_height - band_height + 2 * mm, f"{flag} {sample.country_name or 'Unknown'}")
+
+    qr_width = page_width * 0.38
+    qr_height = qr_width
+    info_width = page_width - qr_width - margin * 3
+    info_x = margin
+    qr_x = page_width - margin - qr_width
+    y = page_height - band_height - margin
+
+    c.setFillColor(HexColor('#000000'))
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(info_x, y, "Indian Ecotrade")
+    y -= 5 * mm
+    c.setFont("Helvetica", 8)
+    c.drawString(info_x, y, f"Origen: {sample.origin or '-'}")
+    y -= 4.5 * mm
+    c.drawString(info_x, y, f"Calidad: {sample.quality or '-'}")
+    y -= 4.5 * mm
+    c.drawString(info_x, y, f"Proveedor: {sample.producer or '-'}")
+    y -= 4.5 * mm
+    c.drawString(info_x, y, f"Ref. proveedor: {sample.supplier_reference or '-'}")
+    y -= 4.5 * mm
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(info_x, y, f"Código: {sample.code}")
+    y -= 4.5 * mm
     if sample.purchase_contract_cvc:
-        c.setFont("Helvetica", 7)
-        c.drawString(margin, y_pos, f"CVC: {sample.purchase_contract_cvc}")
-        y_pos -= 3*mm
-    
-    # Divider before availability
-    c.setLineWidth(0.5)
-    c.line(margin, y_pos + 1*mm, width - margin, y_pos + 1*mm)
-    y_pos -= 3*mm
-    
-    # BOTTOM SECTION: Availability and QR
-    # Available quantity
-    c.setFont("Helvetica-Bold", 8)
-    c.setFillColor(HexColor('#2E7D32'))  # Green for available
-    c.drawString(margin, y_pos, f"DISPONIBLES: {sample.available_quantity_g} g")
-    
-    # QR Code (right side)
+        c.setFont("Helvetica", 8)
+        c.drawString(info_x, y, f"CVC: {sample.purchase_contract_cvc}")
+        y -= 4.5 * mm
+
     qr_path = io.BytesIO()
     qr_img.save(qr_path, format="PNG")
     qr_path.seek(0)
-    
-    qr_size = 20*mm
     try:
-        c.drawImage(ImageReader(qr_path), width - margin - qr_size, y_pos - qr_size - 2*mm, width=qr_size, height=qr_size)
-    except:
+        c.drawImage(ImageReader(qr_path), qr_x, page_height - margin - qr_height, width=qr_width, height=qr_height, preserveAspectRatio=True, mask='auto')
+    except Exception:
         pass
-    
+
     c.save()
     pdf_buffer.seek(0)
     headers = {"Content-Disposition": f"attachment; filename=\"muestra_{sample.code}.pdf\""}
