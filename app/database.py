@@ -1,4 +1,5 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+import logging
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 import os
@@ -36,9 +37,11 @@ def create_tables():
     """Create all tables"""
     Base.metadata.create_all(bind=engine)
     # Ensure new columns exist for Sample (simple automatic migration for SQLite)
+    logger = logging.getLogger("app.database")
+    logger.setLevel(logging.DEBUG)
     try:
         with engine.connect() as conn:
-            res = conn.execute("PRAGMA table_info('samples')")
+            res = conn.exec_driver_sql("PRAGMA table_info('samples')")
             existing = {row[1] for row in res.fetchall()}
 
             # desired columns and their SQLite types
@@ -52,28 +55,46 @@ def create_tables():
                 'sample_type': 'TEXT',
                 'category': 'TEXT',
                 'commercial_result': 'TEXT',
+                'physical_location': 'TEXT',
             }
 
             for col, coltype in extras.items():
                 if col not in existing:
                     try:
-                        conn.execute(f"ALTER TABLE samples ADD COLUMN {col} {coltype}")
+                        conn.exec_driver_sql(f"ALTER TABLE samples ADD COLUMN {col} {coltype}")
+                        logger.info(f"Added column {col} to samples")
                     except Exception:
-                        pass
+                        logger.exception(f"Failed to add column {col} to samples")
+
             # Ensure documents table has tasting_id column for tasting-specific docs
             try:
-                res2 = conn.execute("PRAGMA table_info('documents')")
-                existing_docs = {row[1] for row in res2.fetchall()}
+                res2 = conn.exec_driver_sql("PRAGMA table_info('events')")
+                existing_events = {row[1] for row in res2.fetchall()}
+                if 'tasting_id' not in existing_events:
+                    try:
+                        conn.exec_driver_sql("ALTER TABLE events ADD COLUMN tasting_id INTEGER")
+                        logger.info("Added column tasting_id to events")
+                    except Exception:
+                        logger.exception("Failed to add tasting_id to events")
+            except Exception:
+                logger.exception("Failed to inspect/modify events table")
+
+            # Ensure documents table has tasting_id column too (documents separate table)
+            try:
+                res_docs = conn.exec_driver_sql("PRAGMA table_info('documents')")
+                existing_docs = {row[1] for row in res_docs.fetchall()}
                 if 'tasting_id' not in existing_docs:
                     try:
-                        conn.execute("ALTER TABLE documents ADD COLUMN tasting_id INTEGER")
+                        conn.exec_driver_sql("ALTER TABLE documents ADD COLUMN tasting_id INTEGER")
+                        logger.info("Added column tasting_id to documents")
                     except Exception:
-                        pass
+                        logger.exception("Failed to add tasting_id to documents")
             except Exception:
-                pass
+                logger.exception("Failed to inspect/modify documents table")
+
             # Ensure tastings table has new sieve/roast/valuation/result columns
             try:
-                res3 = conn.execute("PRAGMA table_info('tastings')")
+                res3 = conn.exec_driver_sql("PRAGMA table_info('tastings')")
                 existing_t = {row[1] for row in res3.fetchall()}
                 tasting_extras = {
                     'roast_date': 'DATETIME',
@@ -88,14 +109,16 @@ def create_tables():
                 for col, coltype in tasting_extras.items():
                     if col not in existing_t:
                         try:
-                            conn.execute(f"ALTER TABLE tastings ADD COLUMN {col} {coltype}")
+                            conn.exec_driver_sql(f"ALTER TABLE tastings ADD COLUMN {col} {coltype}")
+                            logger.info(f"Added column {col} to tastings")
                         except Exception:
-                            pass
+                            logger.exception(f"Failed to add column {col} to tastings")
             except Exception:
-                pass
+                logger.exception("Failed to inspect/modify tastings table")
+
             # Ensure samples table has gram-based quantity columns
             try:
-                res4 = conn.execute("PRAGMA table_info('samples')")
+                res4 = conn.exec_driver_sql("PRAGMA table_info('samples')")
                 existing_s = {row[1] for row in res4.fetchall()}
                 sample_extras = {
                     'received_quantity_g': 'INTEGER',
@@ -104,10 +127,24 @@ def create_tables():
                 for col, coltype in sample_extras.items():
                     if col not in existing_s:
                         try:
-                            conn.execute(f"ALTER TABLE samples ADD COLUMN {col} {coltype}")
+                            conn.exec_driver_sql(f"ALTER TABLE samples ADD COLUMN {col} {coltype}")
+                            logger.info(f"Added column {col} to samples")
                         except Exception:
-                            pass
+                            logger.exception(f"Failed to add column {col} to samples")
             except Exception:
-                pass
+                logger.exception("Failed to inspect/modify samples table")
+
+            # Ensure shipments table has quantity_g column
+            try:
+                res5 = conn.exec_driver_sql("PRAGMA table_info('shipments')")
+                existing_shipments = {row[1] for row in res5.fetchall()}
+                if 'quantity_g' not in existing_shipments:
+                    try:
+                        conn.exec_driver_sql("ALTER TABLE shipments ADD COLUMN quantity_g INTEGER")
+                        logger.info("Added column quantity_g to shipments")
+                    except Exception:
+                        logger.exception("Failed to add quantity_g to shipments")
+            except Exception:
+                logger.exception("Failed to inspect/modify shipments table")
     except Exception:
-        pass
+        logging.exception("Unexpected error running migrations in create_tables")

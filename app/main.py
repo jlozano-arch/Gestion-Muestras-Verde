@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
@@ -13,6 +13,7 @@ from reportlab.lib.pagesizes import letter, A6
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
+from reportlab.lib.colors import HexColor
 import json
 import os
 import shutil
@@ -35,9 +36,11 @@ app = FastAPI(
 static_path = Path(__file__).parent / "static"
 static_path.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
-# Mount uploads for served documents
-uploads_path = Path.cwd() / "uploads"
-uploads_path.mkdir(exist_ok=True)
+
+# Configurable uploads path
+UPLOADS_DIR = os.getenv("UPLOADS_DIR", "uploads")
+uploads_path = Path(UPLOADS_DIR)
+uploads_path.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
 # Setup templates
@@ -50,7 +53,7 @@ async def startup_event():
     """Startup event"""
     # Create necessary directories
     Path("./data").mkdir(exist_ok=True)
-    Path("./uploads").mkdir(exist_ok=True)
+    uploads_path.mkdir(parents=True, exist_ok=True)
 
 
 # ============================================================================
@@ -95,6 +98,7 @@ async def list_samples(
     country: str = None,
     producer: str = None,
     supplier_reference: str = None,
+    origin: str = None,
     purchase_cvc: str = None,
     sales_cvv: str = None,
     quality: str = None,
@@ -112,6 +116,8 @@ async def list_samples(
         query = query.filter(Sample.country_code == country)
     if producer:
         query = query.filter(Sample.producer.ilike(f"%{producer}%"))
+    if origin:
+        query = query.filter(Sample.origin.ilike(f"%{origin}%"))
     if supplier_reference:
         query = query.filter(Sample.supplier_reference.ilike(f"%{supplier_reference}%"))
     if purchase_cvc:
@@ -158,18 +164,18 @@ async def new_sample_form(request: Request):
 
 @app.post("/samples")
 async def create_sample(
-    code: str = Form(...),
+    code: str = Form(None),
+    producer: str = Form(...),
+    supplier_reference: str = Form(...),
+    quality: str = Form(...),
     received_date: str = Form(None),
     initial_quantity_grams: str = Form(None),
     available_quantity_grams: str = Form(None),
     country_code: str = Form(None),
     origin: str = Form(None),
-    producer: str = Form(None),
-    supplier_reference: str = Form(None),
     provider_sample_number: str = Form(None),
     purchase_contract_cvc: str = Form(None),
     sales_contract_cvv: str = Form(None),
-    quality: str = Form(None),
     warehouse: str = Form(None),
     sample_type: str = Form(None),
     category: str = Form(None),
@@ -178,10 +184,17 @@ async def create_sample(
     variety: str = Form(None),
     altitude: int = Form(None),
     processing: str = Form(None),
+    physical_location: str = Form(None),
     notes: str = Form(None),
     db: Session = Depends(get_db)
 ):
     """Crear nueva muestra"""
+    # Auto-generate code if not provided
+    if not code or code.strip() == '':
+        import random
+        import string
+        code = f"AUTO-{datetime.utcnow().strftime('%Y%m%d')}-{''.join(random.choices(string.ascii_uppercase + string.digits, k=4))}"
+    
     existing = db.query(Sample).filter(Sample.code == code).first()
     if existing:
         raise HTTPException(status_code=400, detail="El código de muestra ya existe")
@@ -207,6 +220,19 @@ async def create_sample(
         except ValueError:
             created_at = datetime.utcnow()
 
+    received_quantity_g = 0
+    try:
+        received_quantity_g = int(initial_quantity_grams) if initial_quantity_grams not in (None, '') else 0
+    except (ValueError, TypeError):
+        received_quantity_g = 0
+
+    available_quantity_g = received_quantity_g
+    try:
+        if available_quantity_grams not in (None, ''):
+            available_quantity_g = int(available_quantity_grams)
+    except (ValueError, TypeError):
+        available_quantity_g = received_quantity_g
+
     sample = Sample(
         code=code,
         country_code=country_code,
@@ -226,10 +252,11 @@ async def create_sample(
         variety=variety,
         altitude=altitude,
         processing=processing,
+        physical_location=physical_location,
         initial_quantity=initial_quantity,
         available_quantity=available_quantity,
-        received_quantity_g=int(initial_quantity_grams or 0),
-        available_quantity_g=int(available_quantity_grams if available_quantity_grams is not None else (initial_quantity_grams or 0)),
+        received_quantity_g=received_quantity_g,
+        available_quantity_g=available_quantity_g,
         notes=notes,
         status=SampleStatus.RECEIVED,
         created_at=created_at
@@ -242,7 +269,7 @@ async def create_sample(
     event = Event(
         sample_id=sample.id,
         event_type="received",
-        description=f"Muestra registrada - {int(initial_quantity_grams or 0)} g"
+        description=f"Muestra registrada - {received_quantity_g} g"
     )
     db.add(event)
     db.commit()
@@ -269,21 +296,21 @@ async def edit_sample_form(sample_id: int, request: Request, db: Session = Depen
     })
 
 
-@app.post("/samples/{sample_id}")
+@app.api_route("/samples/{sample_id}", methods=["POST", "PUT"])
 async def update_sample(
     sample_id: int,
-    code: str = Form(...),
+    code: str = Form(None),
+    producer: str = Form(...),
+    supplier_reference: str = Form(...),
+    quality: str = Form(...),
     received_date: str = Form(None),
     initial_quantity_grams: int = Form(None),
     available_quantity_grams: int = Form(None),
     country_code: str = Form(None),
     origin: str = Form(None),
-    producer: str = Form(None),
-    supplier_reference: str = Form(None),
     provider_sample_number: str = Form(None),
     purchase_contract_cvc: str = Form(None),
     sales_contract_cvv: str = Form(None),
-    quality: str = Form(None),
     warehouse: str = Form(None),
     sample_type: str = Form(None),
     category: str = Form(None),
@@ -292,12 +319,18 @@ async def update_sample(
     variety: str = Form(None),
     altitude: int = Form(None),
     processing: str = Form(None),
+    physical_location: str = Form(None),
     notes: str = Form(None),
     db: Session = Depends(get_db)
 ):
     sample = db.query(Sample).filter(Sample.id == sample_id).first()
     if not sample:
         raise HTTPException(status_code=404, detail="Muestra no encontrada")
+    
+    # If code not provided, keep existing
+    if not code or code.strip() == '':
+        code = sample.code
+    
     existing = db.query(Sample).filter(Sample.code == code, Sample.id != sample_id).first()
     if existing:
         raise HTTPException(status_code=400, detail="El código de muestra ya existe")
@@ -334,10 +367,17 @@ async def update_sample(
     sample.variety = variety
     sample.altitude = altitude
     sample.processing = processing
+    sample.physical_location = physical_location
     sample.initial_quantity = initial_quantity
     sample.available_quantity = available_quantity
-    sample.received_quantity_g = int(initial_quantity_grams or 0)
-    sample.available_quantity_g = int(available_quantity_grams if available_quantity_grams is not None else (initial_quantity_grams or 0))
+    try:
+        sample.received_quantity_g = int(initial_quantity_grams) if initial_quantity_grams not in (None, '') else sample.received_quantity_g
+    except (ValueError, TypeError):
+        pass
+    try:
+        sample.available_quantity_g = int(available_quantity_grams) if available_quantity_grams not in (None, '') else sample.received_quantity_g
+    except (ValueError, TypeError):
+        pass
     sample.notes = notes
 
     if received_date:
@@ -392,7 +432,7 @@ async def upload_tasting_document(sample_id: int, tasting_id: int, file: UploadF
     if not sample or not tasting:
         raise HTTPException(status_code=404, detail="Sample or tasting not found")
 
-    upload_dir = os.path.join("uploads", "samples", str(sample_id), "tastings", str(tasting_id))
+    upload_dir = os.path.join(UPLOADS_DIR, "samples", str(sample_id), "tastings", str(tasting_id))
     os.makedirs(upload_dir, exist_ok=True)
     filename = os.path.basename(file.filename)
     safe_name = f"{int(datetime.utcnow().timestamp())}_{filename}"
@@ -409,7 +449,7 @@ async def upload_tasting_document(sample_id: int, tasting_id: int, file: UploadF
 
 
 @app.get("/samples/{sample_id}/tastings/{tasting_id}/pdf")
-async def tasting_pdf(sample_id: int, tasting_id: int, db: Session = Depends(get_db)):
+async def tasting_pdf(sample_id: int, tasting_id: int, request: Request, db: Session = Depends(get_db)):
     sample = db.query(Sample).filter(Sample.id == sample_id).first()
     tasting = db.query(Tasting).filter(Tasting.id == tasting_id, Tasting.sample_id == sample_id).first()
     if not sample or not tasting:
@@ -471,7 +511,8 @@ async def tasting_pdf(sample_id: int, tasting_id: int, db: Session = Depends(get
 
     c.save()
     pdf_buffer.seek(0)
-    return FileResponse(pdf_buffer, media_type="application/pdf", filename=f"ficha_cata_{sample.code}_{tasting_id}.pdf")
+    headers = {"Content-Disposition": f"attachment; filename=\"ficha_cata_{sample.code}_{tasting_id}.pdf\""}
+    return StreamingResponse(pdf_buffer, media_type="application/pdf", headers=headers)
 
 
 @app.post("/samples/{sample_id}/documents")
@@ -481,7 +522,7 @@ async def upload_document(sample_id: int, file: UploadFile = File(...), document
     if not sample:
         raise HTTPException(status_code=404, detail="Sample not found")
 
-    upload_dir = os.path.join("uploads", str(sample_id))
+    upload_dir = os.path.join(UPLOADS_DIR, str(sample_id))
     os.makedirs(upload_dir, exist_ok=True)
     filename = os.path.basename(file.filename)
     safe_name = f"{int(datetime.utcnow().timestamp())}_{filename}"
@@ -606,21 +647,22 @@ async def create_tasting(
     )
     
     db.add(tasting)
-    
+    db.commit()
+    db.refresh(tasting)
+
     # Update sample status
     if sample.status == SampleStatus.RECEIVED:
         sample.status = SampleStatus.ANALYZING
-    
+
     # Create event
     event = Event(
         sample_id=sample_id,
+        tasting_id=tasting.id,
         event_type="tasted",
         description=f"Evaluada con puntuación Indian Score: {indian_score:.1f}"
     )
     db.add(event)
-    
     db.commit()
-    db.refresh(tasting)
 
     if redirect:
         return RedirectResponse(f"/samples/{sample_id}", status_code=303)
@@ -693,8 +735,8 @@ async def create_shipment(
 # ============================================================================
 
 @app.get("/samples/{sample_id}/label")
-async def generate_label(sample_id: int, db: Session = Depends(get_db)):
-    """Generar etiqueta PDF con QR"""
+async def generate_label(sample_id: int, request: Request, db: Session = Depends(get_db)):
+    """Generar etiqueta PDF con QR y banda de país"""
     sample = db.query(Sample).filter(Sample.id == sample_id).first()
     if not sample:
         raise HTTPException(status_code=404, detail="Muestra no encontrada")
@@ -703,8 +745,11 @@ async def generate_label(sample_id: int, db: Session = Depends(get_db)):
         Tasting.sample_id == sample_id
     ).order_by(desc(Tasting.indian_score)).first()
     
-    # Generate QR code pointing to the sample detail (public relative URL)
-    qr_data = f"http://localhost:8000/samples/{sample_id}"
+    # Generate QR code pointing to the sample detail (use APP_BASE_URL if set)
+    base = os.getenv('APP_BASE_URL')
+    if not base:
+        base = str(request.base_url)
+    qr_data = f"{base.rstrip('/')}/samples/{sample_id}"
     qr = qrcode.QRCode(version=1, box_size=4, border=1)
     qr.add_data(qr_data)
     qr.make(fit=True)
@@ -717,64 +762,99 @@ async def generate_label(sample_id: int, db: Session = Depends(get_db)):
     
     # Dimensions
     width, height = A6
-    
+    margin = 5*mm
 
-    # Title and logo
+    # TOP BAND: Country flag and band (using colors)
+    # For now, we'll draw a colored band with country name
+    band_height = 12*mm
+    
+    # Simple color mapping for countries (can be expanded)
+    country_colors = {
+        'PE': HexColor('#DC143C'),  # Peru - Red
+        'CO': HexColor('#FCD116'),  # Colombia - Yellow
+        'BR': HexColor('#009B3A'),  # Brazil - Green
+        'EC': HexColor('#F4D03F'),  # Ecuador - Yellow
+        'BO': HexColor('#F4D03F'),  # Bolivia - Yellow
+    }
+    
+    band_color = country_colors.get(sample.country_code, HexColor('#CCCCCC'))
+    c.setFillColor(band_color)
+    c.rect(0, height - band_height, width, band_height, fill=1, stroke=0)
+    
+    # White text on colored band
+    c.setFillColor(HexColor('#FFFFFF'))
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(10*mm, height - 10*mm, "INDIAN ECOTRADE")
-    c.setFont("Helvetica", 8)
-    c.drawString(10*mm, height - 15*mm, "Café Verde")
-
-    # Try to draw logo if exists
-    try:
-        logo_path = Path(__file__).parent / "static" / "logo.png"
-        if logo_path.exists():
-            logo_reader = ImageReader(str(logo_path))
-            c.drawImage(logo_reader, width - 40*mm, height - 18*mm, width=28*mm, height=12*mm, preserveAspectRatio=True, mask='auto')
-    except Exception:
-        pass
-
-    # Sample info block
-    c.setFont("Helvetica-Bold", 8)
-    c.drawString(10*mm, height - 22*mm, f"Código: {sample.code}")
-    c.setFont("Helvetica", 7)
-    # country and flag (flag may be emoji)
-    try:
-        flag = get_country_flag(sample.country_code)
-    except Exception:
-        flag = ''
-    c.drawString(10*mm, height - 26*mm, f"País: {sample.country_name} {flag}")
-    c.drawString(10*mm, height - 29*mm, f"Origen: {sample.origin}")
-    c.drawString(10*mm, height - 32*mm, f"Calidad: {sample.quality or '-'}")
-    c.drawString(10*mm, height - 35*mm, f"Proveedor: {sample.producer or '-'}")
-    c.drawString(10*mm, height - 38*mm, f"Ref. proveedor: {sample.supplier_reference or '-'}")
-    c.drawString(10*mm, height - 41*mm, f"Contrato CVC: {sample.purchase_contract_cvc or '-'}")
-    if sample.sales_contract_cvv:
-        c.drawString(10*mm, height - 44*mm, f"Contrato CVV: {sample.sales_contract_cvv}")
-    c.drawString(10*mm, height - 47*mm, f"Disponibles: {sample.available_quantity} kg")
-
-    if best_tasting:
-        c.setFont("Helvetica-Bold", 8)
-        c.drawString(10*mm, height - 51*mm, f"Indian Score: {best_tasting.indian_score:.1f}")
+    flag = get_country_flag(sample.country_code) if sample.country_code else '🌍'
+    c.drawString(margin, height - band_height + 2*mm, f"{flag} {sample.country_name or 'Unknown'}")
     
-    # QR Code
+    # CONTENT AREA
+    y_pos = height - band_height - margin
+    
+    # Company header
+    c.setFillColor(HexColor('#000000'))
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(margin, y_pos, "INDIAN ECOTRADE")
+    y_pos -= 4*mm
+    
+    # Divider line
+    c.setLineWidth(0.5)
+    c.line(margin, y_pos + 1*mm, width - margin, y_pos + 1*mm)
+    y_pos -= 2*mm
+    
+    # MAIN INFO SECTION (Center column)
+    c.setFont("Helvetica", 7)
+    
+    # Quality
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(margin, y_pos, f"CALIDAD: {sample.quality or '-'}")
+    y_pos -= 4*mm
+    
+    # Producer
+    c.setFont("Helvetica", 7)
+    c.drawString(margin, y_pos, f"Proveedor: {sample.producer or '-'}")
+    y_pos -= 3.5*mm
+    
+    # Supplier reference
+    c.drawString(margin, y_pos, f"Ref. proveedor: {sample.supplier_reference or '-'}")
+    y_pos -= 3.5*mm
+    
+    # Sample code
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(margin, y_pos, f"CÓDIGO: {sample.code}")
+    y_pos -= 4*mm
+    
+    # CVC (if exists)
+    if sample.purchase_contract_cvc:
+        c.setFont("Helvetica", 7)
+        c.drawString(margin, y_pos, f"CVC: {sample.purchase_contract_cvc}")
+        y_pos -= 3*mm
+    
+    # Divider before availability
+    c.setLineWidth(0.5)
+    c.line(margin, y_pos + 1*mm, width - margin, y_pos + 1*mm)
+    y_pos -= 3*mm
+    
+    # BOTTOM SECTION: Availability and QR
+    # Available quantity
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColor(HexColor('#2E7D32'))  # Green for available
+    c.drawString(margin, y_pos, f"DISPONIBLES: {sample.available_quantity_g} g")
+    
+    # QR Code (right side)
     qr_path = io.BytesIO()
     qr_img.save(qr_path, format="PNG")
     qr_path.seek(0)
     
+    qr_size = 20*mm
     try:
-        c.drawImage(ImageReader(qr_path), width - 35*mm, 10*mm, width=25*mm, height=25*mm)
+        c.drawImage(ImageReader(qr_path), width - margin - qr_size, y_pos - qr_size - 2*mm, width=qr_size, height=qr_size)
     except:
         pass
     
     c.save()
-    
     pdf_buffer.seek(0)
-    return FileResponse(
-        pdf_buffer,
-        media_type="application/pdf",
-        filename=f"muestra_{sample.code}.pdf"
-    )
+    headers = {"Content-Disposition": f"attachment; filename=\"muestra_{sample.code}.pdf\""}
+    return StreamingResponse(pdf_buffer, media_type="application/pdf", headers=headers)
 
 
 # ============================================================================

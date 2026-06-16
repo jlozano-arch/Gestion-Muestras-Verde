@@ -8,8 +8,11 @@ services:
     volumes:
       - .:/app
       - ./data:/app/data
+      - ./uploads:/app/uploads
     environment:
       - DATABASE_URL=sqlite:///./data/muestras.db
+      - UPLOADS_DIR=./uploads
+      - APP_BASE_URL=http://localhost:8000
       - DEBUG=true
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped

@@ -41,7 +41,8 @@ class Sample(Base):
     variety = Column(String(200))
     altitude = Column(Integer)
     processing = Column(String(100))
-    initial_quantity = Column(Float)  # kg
+    physical_location = Column(String(500))
+    initial_quantity = Column(Float)  # kg (deprecated, for backward compatibility)
     available_quantity = Column(Float)  # kg
     # New gram-based fields
     received_quantity_g = Column(Integer, default=0)
@@ -117,6 +118,7 @@ class Tasting(Base):
     # Relationships
     sample = relationship("Sample", back_populates="tastings")
     documents = relationship("Document", back_populates="tasting", cascade="all, delete-orphan")
+    events = relationship("Event", back_populates="tasting", cascade="all, delete-orphan")
 
 
 class Shipment(Base):
@@ -139,7 +141,7 @@ class Shipment(Base):
     sample = relationship("Sample", back_populates="shipments")
 
 
-class Document(Base):
+class Event(Base):
     """Event timeline"""
     __tablename__ = "events"
 
@@ -147,23 +149,22 @@ class Document(Base):
     sample_id = Column(Integer, ForeignKey("samples.id"), index=True)
     event_type = Column(String(50))  # received, tasted, shipped, archived, etc.
     tasting_id = Column(Integer, ForeignKey("tastings.id"), index=True, nullable=True)
-    tasting_id = Column(Integer, ForeignKey("tastings.id"), index=True, nullable=True)
     description = Column(String(500))
     event_date = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, server_default=func.now())
 
     # Relationships
     sample = relationship("Sample", back_populates="events")
-    sample = relationship("Sample", back_populates="documents")
-    tasting = relationship("Tasting", back_populates="documents")
+    tasting = relationship("Tasting", back_populates="events")
 
-    tasting = relationship("Tasting", backref="documents")
+
 class Document(Base):
     """Document/photo storage"""
     __tablename__ = "documents"
 
     id = Column(Integer, primary_key=True, index=True)
     sample_id = Column(Integer, ForeignKey("samples.id"), index=True)
+    tasting_id = Column(Integer, ForeignKey("tastings.id"), index=True, nullable=True)
     file_name = Column(String(255))
     file_path = Column(String(500))
     file_type = Column(String(50))  # photo, certificate, analysis, etc.
@@ -172,3 +173,4 @@ class Document(Base):
 
     # Relationships
     sample = relationship("Sample", back_populates="documents")
+    tasting = relationship("Tasting", back_populates="documents")

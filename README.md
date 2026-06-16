@@ -84,7 +84,29 @@ Gestion-Muestras-Verde/
 
 Variables de entorno:
 - `DATABASE_URL` - URL de conexión a BD
+- `APP_BASE_URL` - Base URL para los QR en etiquetas PDF
+- `UPLOADS_DIR` - Directorio de uploads para documentos y fotos
+- `SECRET_KEY` - Clave secreta de la aplicación
 - `DEBUG` - Modo debug (true/false)
+
+Ejemplo de archivo de entorno:
+
+```bash
+cp .env.example .env
+```
+
+### Docker
+
+El `docker-compose.yml` monta los volúmenes:
+
+- `./data:/app/data` para la base de datos SQLite persistente
+- `./uploads:/app/uploads` para documentos y fotos persistentes
+
+Si quieres exponer la app en la red local, ajusta `APP_BASE_URL` a la URL pública del servidor, por ejemplo:
+
+```bash
+APP_BASE_URL=http://192.168.1.100:8000
+```
 
 ## Licencia
 
