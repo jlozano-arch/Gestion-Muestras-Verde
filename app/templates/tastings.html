@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Listado de Catas</h2>
+<table class="table">
+    <thead>
+        <tr><th>Fecha</th><th>Muestra</th><th>Proveedor</th><th>Ref. proveedor</th><th>Indian</th><th>Comercial</th><th>Resultado</th><th></th></tr>
+    </thead>
+    <tbody>
+    {% for t in tastings %}
+        <tr>
+            <td>{{ t.tasting_date.strftime('%Y-%m-%d') }}</td>
+            <td><a href="/samples/{{ t.sample.id }}">{{ t.sample.code }}</a></td>
+            <td>{{ t.sample.producer }}</td>
+            <td>{{ t.sample.supplier_reference or '-' }}</td>
+            <td>{{ '%.1f'|format(t.indian_score or 0) }}</td>
+            <td>{{ '%.1f'|format(t.commercial_score or 0) }}</td>
+            <td>{{ t.result.value if t.result else '-' }}</td>
+            <td><a href="/samples/{{ t.sample.id }}/tastings/{{ t.id }}/pdf" target="_blank">Ficha</a></td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

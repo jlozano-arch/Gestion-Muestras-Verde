@@ -1,5 +1,16 @@
 <form id="tasting-form-element" method="post" action="/samples/{{ sample.id }}/tastings" class="tasting-form">
     <h4>Nueva Cata</h4>
+    <input type="hidden" name="redirect" value="1">
+    <div class="form-row">
+        <div class="form-group">
+            <label>Fecha de cata</label>
+            <input type="date" name="tasting_date">
+        </div>
+        <div class="form-group">
+            <label>Fecha de tueste</label>
+            <input type="date" name="roast_date">
+        </div>
+    </div>
     
     <div class="form-row">
         <div class="form-group">
@@ -11,18 +22,18 @@
     <fieldset>
         <legend>Análisis de Criba</legend>
         <div class="form-row">
-            <div class="form-group">
-                <label>Criba 18+ (%)</label>
-                <input type="number" name="sieve_18" required step="0.1" min="0" max="100">
-            </div>
-            <div class="form-group">
-                <label>Criba 16+ (%)</label>
-                <input type="number" name="sieve_16" required step="0.1" min="0" max="100">
-            </div>
-            <div class="form-group">
-                <label>Criba 14+ (%)</label>
-                <input type="number" name="sieve_14" required step="0.1" min="0" max="100">
-            </div>
+            <div class="form-group"><label>Criba 18+ (%)</label><input type="number" name="sieve_18" required step="0.1" min="0" max="100"></div>
+            <div class="form-group"><label>Criba 17 (%)</label><input type="number" name="sieve_17" step="0.1" min="0" max="100"></div>
+            <div class="form-group"><label>Criba 16+ (%)</label><input type="number" name="sieve_16" required step="0.1" min="0" max="100"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Criba 15 (%)</label><input type="number" name="sieve_15" step="0.1" min="0" max="100"></div>
+            <div class="form-group"><label>Criba 14+ (%)</label><input type="number" name="sieve_14" required step="0.1" min="0" max="100"></div>
+            <div class="form-group"><label>Criba 13 (%)</label><input type="number" name="sieve_13" step="0.1" min="0" max="100"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Criba 12 (%)</label><input type="number" name="sieve_12" step="0.1" min="0" max="100"></div>
+            <div class="form-group"><label>Criba plato (%)</label><input type="number" name="sieve_plato" step="0.1" min="0" max="100"></div>
         </div>
     </fieldset>
 
@@ -40,6 +51,20 @@
             <div class="form-group">
                 <label>Defectos Secundarios</label>
                 <input type="number" name="defects_secondary" value="0" step="1" min="0">
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Resultado y valoración</legend>
+        <div class="form-row">
+            <div class="form-group"><label>Valoración (0-100)</label><input type="number" name="valuation" step="0.1" min="0" max="100"></div>
+            <div class="form-group"><label>Resultado</label>
+                <select name="result">
+                    <option value="pending">Pendiente</option>
+                    <option value="approved">Aprobada</option>
+                    <option value="rejected">Rechazada</option>
+                </select>
             </div>
         </div>
     </fieldset>
@@ -94,7 +119,7 @@
 
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">Guardar Cata</button>
-        <button type="button" onclick="document.getElementById('tasting-form').style.display='none'" class="btn btn-secondary">Cancelar</button>
+        <a href="/samples/{{ sample.id }}" class="btn btn-secondary">Cancelar</a>
     </div>
 </form>
 
@@ -103,15 +128,16 @@
         e.preventDefault();
         
         const formData = new FormData(e.target);
-        const response = await fetch(e.target.action, {
-            method: 'POST',
-            body: formData
-        });
-        
-        if (response.ok) {
-            location.reload();
-        } else {
-            alert('Error al guardar la cata');
-        }
+            const response = await fetch(e.target.action, { method: 'POST', body: formData });
+            if (response.status === 303) {
+                window.location.href = `/samples/{{ sample.id }}`;
+                return;
+            }
+            if (response.ok) {
+                const data = await response.json();
+                window.location.href = `/samples/${data.id ? data.id : '{{ sample.id }}'}`;
+            } else {
+                alert('Error al guardar la cata');
+            }
     });
 </script>

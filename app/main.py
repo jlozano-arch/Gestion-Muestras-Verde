@@ -64,9 +64,10 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     available_samples = db.query(Sample).filter(
         Sample.status == SampleStatus.AVAILABLE
     ).count()
+    # total_quantity in grams using available_quantity_g
     total_quantity = db.query(Sample).filter(
-        Sample.available_quantity > 0
-    ).with_entities(func.sum(Sample.available_quantity)).scalar() or 0
+        Sample.available_quantity_g > 0
+    ).with_entities(func.sum(Sample.available_quantity_g)).scalar() or 0
     
     recent_samples = db.query(Sample).order_by(desc(Sample.created_at)).limit(5).all()
     high_score_samples = db.query(Sample).join(Tasting).order_by(
@@ -77,7 +78,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         "request": request,
         "total_samples": total_samples,
         "available_samples": available_samples,
-        "total_quantity": f"{total_quantity:.1f}",
+                "total_quantity": total_quantity,
         "recent_samples": recent_samples,
         "high_score_samples": high_score_samples,
     })
@@ -158,9 +159,12 @@ async def new_sample_form(request: Request):
 @app.post("/samples")
 async def create_sample(
     code: str = Form(...),
-    country_code: str = Form(...),
-    origin: str = Form(...),
-    producer: str = Form(...),
+    received_date: str = Form(None),
+    initial_quantity_grams: str = Form(None),
+    available_quantity_grams: str = Form(None),
+    country_code: str = Form(None),
+    origin: str = Form(None),
+    producer: str = Form(None),
     supplier_reference: str = Form(None),
     provider_sample_number: str = Form(None),
     purchase_contract_cvc: str = Form(None),
@@ -170,25 +174,43 @@ async def create_sample(
     sample_type: str = Form(None),
     category: str = Form(None),
     commercial_result: str = Form(None),
-    harvest_date: str = Form(...),
-    variety: str = Form(...),
-    altitude: int = Form(...),
-    processing: str = Form(...),
-    initial_quantity: float = Form(...),
+    harvest_date: str = Form(None),
+    variety: str = Form(None),
+    altitude: int = Form(None),
+    processing: str = Form(None),
     notes: str = Form(None),
     db: Session = Depends(get_db)
 ):
     """Crear nueva muestra"""
-    # Check if code already exists
     existing = db.query(Sample).filter(Sample.code == code).first()
     if existing:
         raise HTTPException(status_code=400, detail="El código de muestra ya existe")
-    
-    # Create sample
+
+    try:
+        initial_quantity = float(initial_quantity_grams) / 1000.0 if initial_quantity_grams not in (None, '', '0') else 0.0
+    except ValueError:
+        initial_quantity = 0.0
+    try:
+        available_quantity = float(available_quantity_grams) / 1000.0 if available_quantity_grams not in (None, '') else initial_quantity
+    except ValueError:
+        available_quantity = initial_quantity
+
+    if initial_quantity < 0 or available_quantity < 0:
+        raise HTTPException(status_code=400, detail="Las cantidades no pueden ser negativas")
+    if initial_quantity != 0 and available_quantity > initial_quantity:
+        raise HTTPException(status_code=400, detail="La cantidad disponible no puede ser mayor que la cantidad recibida")
+
+    created_at = datetime.utcnow()
+    if received_date:
+        try:
+            created_at = datetime.fromisoformat(received_date)
+        except ValueError:
+            created_at = datetime.utcnow()
+
     sample = Sample(
         code=code,
         country_code=country_code,
-        country_name=get_country_name(country_code),
+        country_name=get_country_name(country_code) if country_code else None,
         origin=origin,
         producer=producer,
         supplier_reference=supplier_reference,
@@ -205,24 +227,127 @@ async def create_sample(
         altitude=altitude,
         processing=processing,
         initial_quantity=initial_quantity,
-        available_quantity=initial_quantity,
+        available_quantity=available_quantity,
+        received_quantity_g=int(initial_quantity_grams or 0),
+        available_quantity_g=int(available_quantity_grams if available_quantity_grams is not None else (initial_quantity_grams or 0)),
         notes=notes,
-        status=SampleStatus.RECEIVED
+        status=SampleStatus.RECEIVED,
+        created_at=created_at
     )
-    
+
     db.add(sample)
     db.commit()
     db.refresh(sample)
-    
-    # Create event
+
     event = Event(
         sample_id=sample.id,
         event_type="received",
-        description=f"Muestra recibida - {initial_quantity}kg"
+        description=f"Muestra registrada - {int(initial_quantity_grams or 0)} g"
     )
     db.add(event)
     db.commit()
-    
+
+    return JSONResponse({"id": sample.id, "code": sample.code})
+
+
+@app.get("/samples/{sample_id}/edit", response_class=HTMLResponse)
+async def edit_sample_form(sample_id: int, request: Request, db: Session = Depends(get_db)):
+    sample = db.query(Sample).filter(Sample.id == sample_id).first()
+    if not sample:
+        raise HTTPException(status_code=404, detail="Muestra no encontrada")
+
+    return templates.TemplateResponse("sample_form.html", {
+        "request": request,
+        "sample": sample,
+        "action_url": f"/samples/{sample.id}",
+        "submit_label": "Actualizar muestra",
+        "countries": get_all_countries(),
+        "processing_methods": [
+            "Washed/Lavado", "Natural/Secado al sol", "Honey/Miel",
+            "Anaerobic", "Fermented"
+        ]
+    })
+
+
+@app.post("/samples/{sample_id}")
+async def update_sample(
+    sample_id: int,
+    code: str = Form(...),
+    received_date: str = Form(None),
+    initial_quantity_grams: int = Form(None),
+    available_quantity_grams: int = Form(None),
+    country_code: str = Form(None),
+    origin: str = Form(None),
+    producer: str = Form(None),
+    supplier_reference: str = Form(None),
+    provider_sample_number: str = Form(None),
+    purchase_contract_cvc: str = Form(None),
+    sales_contract_cvv: str = Form(None),
+    quality: str = Form(None),
+    warehouse: str = Form(None),
+    sample_type: str = Form(None),
+    category: str = Form(None),
+    commercial_result: str = Form(None),
+    harvest_date: str = Form(None),
+    variety: str = Form(None),
+    altitude: int = Form(None),
+    processing: str = Form(None),
+    notes: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    sample = db.query(Sample).filter(Sample.id == sample_id).first()
+    if not sample:
+        raise HTTPException(status_code=404, detail="Muestra no encontrada")
+    existing = db.query(Sample).filter(Sample.code == code, Sample.id != sample_id).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="El código de muestra ya existe")
+
+    try:
+        initial_quantity = float(initial_quantity_grams) / 1000.0 if initial_quantity_grams not in (None, '', '0') else 0.0
+    except ValueError:
+        initial_quantity = 0.0
+    try:
+        available_quantity = float(available_quantity_grams) / 1000.0 if available_quantity_grams not in (None, '') else initial_quantity
+    except ValueError:
+        available_quantity = initial_quantity
+
+    if initial_quantity < 0 or available_quantity < 0:
+        raise HTTPException(status_code=400, detail="Las cantidades no pueden ser negativas")
+    if initial_quantity != 0 and available_quantity > initial_quantity:
+        raise HTTPException(status_code=400, detail="La cantidad disponible no puede ser mayor que la cantidad recibida")
+
+    sample.code = code
+    sample.country_code = country_code
+    sample.country_name = get_country_name(country_code) if country_code else None
+    sample.origin = origin
+    sample.producer = producer
+    sample.supplier_reference = supplier_reference
+    sample.provider_sample_number = provider_sample_number
+    sample.purchase_contract_cvc = purchase_contract_cvc
+    sample.sales_contract_cvv = sales_contract_cvv
+    sample.quality = quality
+    sample.warehouse = warehouse
+    sample.sample_type = sample_type
+    sample.category = category
+    sample.commercial_result = commercial_result
+    sample.harvest_date = harvest_date
+    sample.variety = variety
+    sample.altitude = altitude
+    sample.processing = processing
+    sample.initial_quantity = initial_quantity
+    sample.available_quantity = available_quantity
+    sample.received_quantity_g = int(initial_quantity_grams or 0)
+    sample.available_quantity_g = int(available_quantity_grams if available_quantity_grams is not None else (initial_quantity_grams or 0))
+    sample.notes = notes
+
+    if received_date:
+        try:
+            sample.created_at = datetime.fromisoformat(received_date)
+        except ValueError:
+            pass
+
+    db.commit()
+    db.refresh(sample)
     return JSONResponse({"id": sample.id, "code": sample.code})
 
 
@@ -380,21 +505,31 @@ async def upload_document(sample_id: int, file: UploadFile = File(...), document
 async def create_tasting(
     sample_id: int,
     evaluator: str = Form(...),
+    tasting_date: str = Form(None),
+    roast_date: str = Form(None),
     sieve_18: float = Form(...),
+    sieve_17: float = Form(None),
     sieve_16: float = Form(...),
+    sieve_15: float = Form(None),
     sieve_14: float = Form(...),
+    sieve_13: float = Form(None),
+    sieve_12: float = Form(None),
+    sieve_plato: float = Form(None),
     humidity: float = Form(...),
     defects_primary: int = Form(0),
     defects_secondary: int = Form(0),
-    aroma: int = Form(...),
-    acidity: int = Form(...),
-    body: int = Form(...),
-    flavor: int = Form(...),
-    aftertaste: int = Form(...),
-    cleanliness: int = Form(...),
-    balance: int = Form(...),
+    aroma: float = Form(...),
+    acidity: float = Form(...),
+    body: float = Form(...),
+    flavor: float = Form(...),
+    aftertaste: float = Form(...),
+    cleanliness: float = Form(...),
+    balance: float = Form(...),
     tasting_notes: str = Form(None),
     recommendations: str = Form(None),
+    valuation: float = Form(None),
+    result: str = Form(None),
+    redirect: str = Form(None),
     db: Session = Depends(get_db)
 ):
     """Crear cata/evaluación"""
@@ -402,6 +537,21 @@ async def create_tasting(
     if not sample:
         raise HTTPException(status_code=404, detail="Muestra no encontrada")
     
+    # Parse optional dates
+    td = datetime.utcnow()
+    if tasting_date:
+        try:
+            td = datetime.fromisoformat(tasting_date)
+        except Exception:
+            td = datetime.utcnow()
+
+    rd = None
+    if roast_date:
+        try:
+            rd = datetime.fromisoformat(roast_date)
+        except Exception:
+            rd = None
+
     # Calculate scores
     cup_score = (aroma + acidity + body + flavor + aftertaste + cleanliness + balance) / 7
     
@@ -426,10 +576,16 @@ async def create_tasting(
     tasting = Tasting(
         sample_id=sample_id,
         evaluator=evaluator,
-        tasting_date=datetime.utcnow(),
+        tasting_date=td,
+        roast_date=rd,
         sieve_18=sieve_18,
+        sieve_17=sieve_17,
         sieve_16=sieve_16,
+        sieve_15=sieve_15,
         sieve_14=sieve_14,
+        sieve_13=sieve_13,
+        sieve_12=sieve_12,
+        sieve_plato=sieve_plato,
         humidity=humidity,
         defects_primary=defects_primary,
         defects_secondary=defects_secondary,
@@ -445,6 +601,8 @@ async def create_tasting(
         commercial_score=commercial_score,
         tasting_notes=tasting_notes,
         recommendations=recommendations,
+        valuation=valuation,
+        result=(result if result in ["pending","approved","rejected"] else None)
     )
     
     db.add(tasting)
@@ -463,7 +621,10 @@ async def create_tasting(
     
     db.commit()
     db.refresh(tasting)
-    
+
+    if redirect:
+        return RedirectResponse(f"/samples/{sample_id}", status_code=303)
+
     return JSONResponse({"id": tasting.id, "indian_score": indian_score})
 
 
@@ -474,7 +635,7 @@ async def create_tasting(
 @app.post("/samples/{sample_id}/shipments")
 async def create_shipment(
     sample_id: int,
-    quantity: float = Form(...),
+    quantity_g: int = Form(...),
     destination: str = Form(...),
     reference: str = Form(...),
     notes: str = Form(None),
@@ -485,24 +646,26 @@ async def create_shipment(
     if not sample:
         raise HTTPException(status_code=404, detail="Muestra no encontrada")
     
-    if quantity > sample.available_quantity:
+    if quantity_g > sample.available_quantity_g:
         raise HTTPException(
             status_code=400,
-            detail=f"Cantidad solicitada ({quantity}kg) mayor que disponible ({sample.available_quantity}kg)"
+            detail=f"Cantidad solicitada ({quantity_g} g) mayor que disponible ({sample.available_quantity_g} g)"
         )
     
     # Create shipment
     shipment = Shipment(
         sample_id=sample_id,
-        quantity=quantity,
+        quantity=quantity_g / 1000.0,
+        quantity_g=quantity_g,
         destination=destination,
         reference=reference,
         notes=notes,
         status="pending"
     )
     
-    # Reduce available quantity
-    sample.available_quantity -= quantity
+    # Reduce available quantity (grams and kg)
+    sample.available_quantity_g -= quantity_g
+    sample.available_quantity -= (quantity_g / 1000.0)
     
     # Update status
     if sample.available_quantity <= 0:
@@ -514,7 +677,7 @@ async def create_shipment(
     event = Event(
         sample_id=sample_id,
         event_type="shipped",
-        description=f"Envío de {quantity}kg a {destination}"
+        description=f"Envío de {quantity_g} g a {destination}"
     )
     
     db.add(shipment)
@@ -650,6 +813,20 @@ async def compare_samples(
 async def labels_page(request: Request, db: Session = Depends(get_db)):
     samples = db.query(Sample).order_by(desc(Sample.created_at)).all()
     return templates.TemplateResponse('labels.html', {"request": request, "all_samples": samples})
+
+
+@app.get('/tastings', response_class=HTMLResponse)
+async def list_tastings(request: Request, db: Session = Depends(get_db)):
+    tastings = db.query(Tasting).order_by(desc(Tasting.tasting_date)).all()
+    return templates.TemplateResponse('tastings.html', {"request": request, "tastings": tastings})
+
+
+@app.get('/samples/{sample_id}/tastings/new', response_class=HTMLResponse)
+async def new_tasting_form(sample_id: int, request: Request, db: Session = Depends(get_db)):
+    sample = db.query(Sample).filter(Sample.id == sample_id).first()
+    if not sample:
+        raise HTTPException(status_code=404, detail="Muestra no encontrada")
+    return templates.TemplateResponse('tasting_form.html', {"request": request, "sample": sample})
 
 
 # ============================================================================

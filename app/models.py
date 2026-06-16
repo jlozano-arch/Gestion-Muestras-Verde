@@ -43,6 +43,9 @@ class Sample(Base):
     processing = Column(String(100))
     initial_quantity = Column(Float)  # kg
     available_quantity = Column(Float)  # kg
+    # New gram-based fields
+    received_quantity_g = Column(Integer, default=0)
+    available_quantity_g = Column(Integer, default=0)
     status = Column(Enum(SampleStatus), default=SampleStatus.RECEIVED)
     notes = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
@@ -63,11 +66,17 @@ class Tasting(Base):
     sample_id = Column(Integer, ForeignKey("samples.id"), index=True)
     evaluator = Column(String(200))
     tasting_date = Column(DateTime, default=datetime.utcnow)
+    roast_date = Column(DateTime, nullable=True)
     
     # Sieve analysis
     sieve_18 = Column(Float)  # %
+    sieve_17 = Column(Float)
     sieve_16 = Column(Float)  # %
+    sieve_15 = Column(Float)
     sieve_14 = Column(Float)  # %
+    sieve_13 = Column(Float)
+    sieve_12 = Column(Float)
+    sieve_plato = Column(Float)
     
     # Humidity
     humidity = Column(Float)  # %
@@ -89,6 +98,14 @@ class Tasting(Base):
     cup_score = Column(Float)  # 0-100
     indian_score = Column(Float)  # 0-100 proprietary
     commercial_score = Column(Float)  # 0-100 commercial viability
+    valuation = Column(Float, nullable=True)
+
+    class TastingResult(str, enum.Enum):
+        PENDING = "pending"
+        APPROVED = "approved"
+        REJECTED = "rejected"
+
+    result = Column(Enum(TastingResult), default=TastingResult.PENDING)
     
     # Notes
     tasting_notes = Column(Text)
@@ -99,6 +116,7 @@ class Tasting(Base):
 
     # Relationships
     sample = relationship("Sample", back_populates="tastings")
+    documents = relationship("Document", back_populates="tasting", cascade="all, delete-orphan")
 
 
 class Shipment(Base):
@@ -108,6 +126,7 @@ class Shipment(Base):
     id = Column(Integer, primary_key=True, index=True)
     sample_id = Column(Integer, ForeignKey("samples.id"), index=True)
     quantity = Column(Float)  # kg
+    quantity_g = Column(Integer)
     shipment_date = Column(DateTime, default=datetime.utcnow)
     destination = Column(String(200))
     reference = Column(String(100), unique=True)
@@ -120,7 +139,7 @@ class Shipment(Base):
     sample = relationship("Sample", back_populates="shipments")
 
 
-class Event(Base):
+class Document(Base):
     """Event timeline"""
     __tablename__ = "events"
 
@@ -128,13 +147,15 @@ class Event(Base):
     sample_id = Column(Integer, ForeignKey("samples.id"), index=True)
     event_type = Column(String(50))  # received, tasted, shipped, archived, etc.
     tasting_id = Column(Integer, ForeignKey("tastings.id"), index=True, nullable=True)
+    tasting_id = Column(Integer, ForeignKey("tastings.id"), index=True, nullable=True)
     description = Column(String(500))
     event_date = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, server_default=func.now())
 
     # Relationships
     sample = relationship("Sample", back_populates="events")
-
+    sample = relationship("Sample", back_populates="documents")
+    tasting = relationship("Tasting", back_populates="documents")
 
     tasting = relationship("Tasting", backref="documents")
 class Document(Base):

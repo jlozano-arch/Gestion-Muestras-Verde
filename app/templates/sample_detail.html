@@ -11,6 +11,7 @@
     </div>
     <div class="page-actions">
         <a href="/samples/{{ sample.id }}/label" class="btn btn-secondary" target="_blank"><i class="fa-solid fa-file-pdf"></i> Etiqueta PDF</a>
+        <a href="/samples/{{ sample.id }}/edit" class="btn btn-secondary"><i class="fa-solid fa-pen-to-square"></i> Editar muestra</a>
         <a href="/samples" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Volver</a>
     </div>
 </div>
@@ -30,7 +31,7 @@
             <div class="sample-summary">
                 <div>
                     <span class="summary-label">Disponibles</span>
-                    <strong>{{ sample.available_quantity }} / {{ sample.initial_quantity }} kg</strong>
+                    <strong>{{ sample.available_quantity_g }} / {{ sample.received_quantity_g }} g</strong>
                 </div>
             </div>
         </div>
@@ -101,63 +102,64 @@
         <div id="tastings" class="tab-content">
             <h3>Evaluaciones de cata</h3>
             {% if tastings %}
-                {% for tasting in tastings %}
-                <div class="tasting-card card">
-                    <div class="tasting-header">
-                        <h4>{{ tasting.evaluator }} • {{ tasting.tasting_date.strftime('%d/%m/%Y') }}</h4>
-                        <div class="tasting-scores">
-                            <span class="score indian-score"><i class="fa-solid fa-star"></i> {{ "%.1f"|format(tasting.indian_score) }}</span>
-                            <span class="score cup-score"><i class="fa-solid fa-mug-hot"></i> {{ "%.1f"|format(tasting.cup_score) }}</span>
+                    {% for t in tastings %}
+                    <div class="tasting-card card">
+                        <div class="tasting-header">
+                            <h4>{{ t.evaluator }} • {{ t.tasting_date.strftime('%d/%m/%Y') }}</h4>
+                            <div class="tasting-scores">
+                                <span class="score indian-score"><i class="fa-solid fa-star"></i> {{ "%.1f"|format(t.indian_score) }}</span>
+                                <span class="score cup-score"><i class="fa-solid fa-mug-hot"></i> {{ "%.1f"|format(t.cup_score) }}</span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="tasting-data">
-                        <div class="data-row"><span>Criba 18+:</span><strong>{{ "%.1f"|format(tasting.sieve_18) }}%</strong><span>Criba 16+:</span><strong>{{ "%.1f"|format(tasting.sieve_16) }}%</strong><span>Criba 14+:</span><strong>{{ "%.1f"|format(tasting.sieve_14) }}%</strong></div>
-                        <div class="data-row"><span>Humedad:</span><strong>{{ "%.1f"|format(tasting.humidity) }}%</strong><span>Defectos primarios:</span><strong>{{ tasting.defects_primary }}</strong><span>Defectos secundarios:</span><strong>{{ tasting.defects_secondary }}</strong></div>
-                    </div>
-                    {% if tasting.tasting_notes %}
-                    <div class="tasting-notes"><strong>Notas de cata:</strong><p>{{ tasting.tasting_notes }}</p></div>
-                    {% endif %}
-                    {% if tasting.recommendations %}
-                    <div class="tasting-recommendations"><strong>Recomendaciones:</strong><p>{{ tasting.recommendations }}</p></div>
-                    {% endif %}
-                    <div class="tasting-actions">
-                        <a class="btn btn-secondary" href="/samples/{{ sample.id }}/tastings/{{ tasting.id }}/pdf" target="_blank"><i class="fa-solid fa-file-pdf"></i> Ficha de cata PDF</a>
-                    </div>
-                    <div class="tasting-docs">
-                        <h5>Galería de cata</h5>
-                        <div class="documents-grid">
-                            {% set tasting_docs = [] %}
-                            {% for doc in documents %}
-                                {% if doc.tasting_id == tasting.id %}
-                                    {% set _ = tasting_docs.append(doc) %}
-                                {% endif %}
-                            {% endfor %}
-                            {% if tasting_docs %}
-                                {% for doc in tasting_docs %}
-                                <div class="document-card gallery-card">
-                                    <div class="gallery-thumb">
-                                        {% if doc.file_type and doc.file_type.startswith('image') %}
-                                            <img src="/uploads/samples/{{ sample.id }}/tastings/{{ doc.file_path.split('/')[-1] }}" alt="{{ doc.file_name }}" />
-                                        {% else %}
-                                            <i class="fa-solid fa-file-lines"></i>
-                                        {% endif %}
-                                    </div>
-                                    <div>
-                                        <p class="doc-name"><a href="/uploads/samples/{{ sample.id }}/tastings/{{ doc.file_path.split('/')[-1] }}" target="_blank">{{ doc.file_name }}</a></p>
-                                    </div>
-                                </div>
+                        <div class="tasting-data">
+                            <div class="data-row"><span>Criba 18+:</span><strong>{{ "%.1f"|format(t.sieve_18) }}%</strong><span>Criba 16+:</span><strong>{{ "%.1f"|format(t.sieve_16) }}%</strong><span>Criba 14+:</span><strong>{{ "%.1f"|format(t.sieve_14) }}%</strong></div>
+                            <div class="data-row"><span>Humedad:</span><strong>{{ "%.1f"|format(t.humidity) }}%</strong><span>Defectos primarios:</span><strong>{{ t.defects_primary }}</strong><span>Defectos secundarios:</span><strong>{{ t.defects_secondary }}</strong></div>
+                        </div>
+                        {% if t.tasting_notes %}
+                        <div class="tasting-notes"><strong>Notas de cata:</strong><p>{{ t.tasting_notes }}</p></div>
+                        {% endif %}
+                        {% if t.recommendations %}
+                        <div class="tasting-recommendations"><strong>Recomendaciones:</strong><p>{{ t.recommendations }}</p></div>
+                        {% endif %}
+                        <div class="tasting-actions">
+                            <a class="btn btn-secondary" href="/samples/{{ sample.id }}/tastings/{{ t.id }}/pdf" target="_blank"><i class="fa-solid fa-file-pdf"></i> Ficha PDF</a>
+                            <a class="btn btn-secondary" href="/samples/{{ sample.id }}#tasting-{{ t.id }}">Ver</a>
+                        </div>
+                        <div class="tasting-docs">
+                            <h5>Galería de cata</h5>
+                            <div class="documents-grid">
+                                {% set tasting_docs = [] %}
+                                {% for doc in documents %}
+                                    {% if doc.tasting_id == t.id %}
+                                        {% set _ = tasting_docs.append(doc) %}
+                                    {% endif %}
                                 {% endfor %}
-                            {% else %}
-                                <p class="empty">No hay fotos para esta cata</p>
-                            {% endif %}
+                                {% if tasting_docs %}
+                                    {% for doc in tasting_docs %}
+                                    <div class="document-card gallery-card">
+                                        <div class="gallery-thumb">
+                                            {% if doc.file_type and doc.file_type.startswith('image') %}
+                                                <img src="/uploads/samples/{{ sample.id }}/tastings/{{ doc.file_path.split('/')[-1] }}" alt="{{ doc.file_name }}" />
+                                            {% else %}
+                                                <i class="fa-solid fa-file-lines"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <p class="doc-name"><a href="/uploads/samples/{{ sample.id }}/tastings/{{ doc.file_path.split('/')[-1] }}" target="_blank">{{ doc.file_name }}</a></p>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="empty">No hay fotos para esta cata</p>
+                                {% endif %}
+                            </div>
+                            <form method="post" action="/samples/{{ sample.id }}/tastings/{{ t.id }}/documents" enctype="multipart/form-data" class="upload-form">
+                                <div class="form-row"><div class="form-group"><label>Subir foto/certificado</label><input type="file" name="file" required></div><div class="form-group"><label>Tipo</label><input type="text" name="document_type" placeholder="cafe_verde, cafe_tostado, molido, ficha"></div></div>
+                                <div class="form-actions"><button class="btn btn-primary" type="submit">Subir a la cata</button></div>
+                            </form>
                         </div>
-                        <form method="post" action="/samples/{{ sample.id }}/tastings/{{ tasting.id }}/documents" enctype="multipart/form-data" class="upload-form">
-                            <div class="form-row"><div class="form-group"><label>Subir foto/certificado</label><input type="file" name="file" required></div><div class="form-group"><label>Tipo</label><input type="text" name="document_type" placeholder="cafe_verde, cafe_tostado, molido, ficha"></div></div>
-                            <div class="form-actions"><button class="btn btn-primary" type="submit">Subir a la cata</button></div>
-                        </form>
                     </div>
-                </div>
-                {% endfor %}
+                    {% endfor %}
             {% else %}
                 <p class="empty">No hay evaluaciones registradas</p>
             {% endif %}

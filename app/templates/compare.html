@@ -51,7 +51,7 @@
                 <tr><td><strong>País</strong></td>{% for sample in samples %}<td>{{ sample.country_name }}</td>{% endfor %}</tr>
                 <tr><td><strong>Origen</strong></td>{% for sample in samples %}<td>{{ sample.origin }}</td>{% endfor %}</tr>
                 <tr><td><strong>Variedad</strong></td>{% for sample in samples %}<td>{{ sample.variety }}</td>{% endfor %}</tr>
-                <tr><td><strong>Disponible</strong></td>{% for sample in samples %}<td>{{ sample.available_quantity }} kg</td>{% endfor %}</tr>
+                <tr><td><strong>Disponible</strong></td>{% for sample in samples %}<td>{{ sample.available_quantity_g }} g</td>{% endfor %}</tr>
                 <tr><td><strong>Procesamiento</strong></td>{% for sample in samples %}<td>{{ sample.processing }}</td>{% endfor %}</tr>
                 {% if tastings %}
                 <tr class="comparison-scores"><td><strong>Indian Score</strong></td>{% for sample in samples %}<td>{% if tastings[sample.id] %}<span class="score">{{ "%.1f"|format(tastings[sample.id].indian_score) }}</span>{% else %}<span class="no-data">-</span>{% endif %}</td>{% endfor %}</tr>

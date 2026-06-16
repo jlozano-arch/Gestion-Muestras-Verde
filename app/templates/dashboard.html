@@ -46,6 +46,13 @@
         </div>
     </article>
     <article class="stat-card card">
+        <div class="stat-icon"><i class="fa-solid fa-balance-scale-left"></i></div>
+        <div>
+            <p class="stat-label">Cantidad disponible total (g)</p>
+            <div class="stat-number">{{ total_quantity }}</div>
+        </div>
+    </article>
+    <article class="stat-card card">
         <div class="stat-icon"><i class="fa-solid fa-ban"></i></div>
         <div>
             <p class="stat-label">Rechazadas</p>
@@ -127,7 +134,7 @@
                         <p>{{ sample.country_name }} • {{ sample.origin }}</p>
                     </div>
                     <div class="recent-meta">
-                        <span>{{ sample.available_quantity }} kg</span>
+                        <span>{{ sample.available_quantity_g }} g</span>
                         <a href="/samples/{{ sample.id }}" class="btn btn-small btn-secondary">Ver</a>
                     </div>
                 </div>

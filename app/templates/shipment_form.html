@@ -2,13 +2,13 @@
     <h4>Registrar Envío</h4>
 
     <div class="form-group">
-        <label>Cantidad Disponible: {{ sample.available_quantity }} kg</label>
+        <label>Cantidad Disponible: {{ sample.available_quantity_g }} g</label>
     </div>
 
     <div class="form-row">
         <div class="form-group">
-            <label>Cantidad a Enviar (kg) *</label>
-            <input type="number" name="quantity" required step="0.1" min="0" max="{{ sample.available_quantity }}" placeholder="Ej: 50">
+            <label>Cantidad a Enviar (g) *</label>
+            <input type="number" name="quantity_g" required step="1" min="0" max="{{ sample.available_quantity_g }}" placeholder="Ej: 500">
         </div>
         <div class="form-group">
             <label>Referencia de Envío *</label>

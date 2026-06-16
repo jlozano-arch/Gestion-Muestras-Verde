@@ -71,5 +71,43 @@ def create_tables():
                         pass
             except Exception:
                 pass
+            # Ensure tastings table has new sieve/roast/valuation/result columns
+            try:
+                res3 = conn.execute("PRAGMA table_info('tastings')")
+                existing_t = {row[1] for row in res3.fetchall()}
+                tasting_extras = {
+                    'roast_date': 'DATETIME',
+                    'sieve_17': 'REAL',
+                    'sieve_15': 'REAL',
+                    'sieve_13': 'REAL',
+                    'sieve_12': 'REAL',
+                    'sieve_plato': 'REAL',
+                    'valuation': 'REAL',
+                    'result': 'TEXT'
+                }
+                for col, coltype in tasting_extras.items():
+                    if col not in existing_t:
+                        try:
+                            conn.execute(f"ALTER TABLE tastings ADD COLUMN {col} {coltype}")
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+            # Ensure samples table has gram-based quantity columns
+            try:
+                res4 = conn.execute("PRAGMA table_info('samples')")
+                existing_s = {row[1] for row in res4.fetchall()}
+                sample_extras = {
+                    'received_quantity_g': 'INTEGER',
+                    'available_quantity_g': 'INTEGER'
+                }
+                for col, coltype in sample_extras.items():
+                    if col not in existing_s:
+                        try:
+                            conn.execute(f"ALTER TABLE samples ADD COLUMN {col} {coltype}")
+                        except Exception:
+                            pass
+            except Exception:
+                pass
     except Exception:
         pass
