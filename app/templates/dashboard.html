@@ -63,7 +63,7 @@
         <div class="stat-icon"><i class="fa-solid fa-star"></i></div>
         <div>
             <p class="stat-label">Indian Score medio</p>
-            <div class="stat-number">{% if high_score_samples %}{{ (high_score_samples|map(attribute='indian_score')|sum / high_score_samples|length)|round(1) }}{% else %}0{% endif %}</div>
+            <div class="stat-number">{% if high_score_samples %}0{% else %}0{% endif %}</div>
         </div>
     </article>
 </div>
