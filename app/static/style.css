@@ -321,6 +321,12 @@ body:has(.dashboard-opsbar) .container {
     color: #1f6f3a;
 }
 
+.app-message.danger {
+    border: 1px solid rgba(159, 61, 61, 0.22);
+    background: #fbefef;
+    color: #8e3030;
+}
+
 .card {
     background: var(--surface);
     border-radius: var(--radius);

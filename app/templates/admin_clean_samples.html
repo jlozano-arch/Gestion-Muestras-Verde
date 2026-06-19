@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Limpiar muestras{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <span class="eyebrow"><i class="fa-solid fa-shield-halved"></i> Administracion</span>
+        <h2>Limpiar muestras</h2>
+        <p class="lead">Accion local para borrar todas las muestras y sus datos asociados sin borrar batches, import rows, Excels originales, configuracion ni estructura.</p>
+    </div>
+    <div class="page-actions">
+        <a href="/imports" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Volver a importaciones</a>
+    </div>
+</div>
+
+{% if error %}
+<section class="app-message danger">
+    <i class="fa-solid fa-triangle-exclamation"></i> {{ error }}
+</section>
+{% endif %}
+
+{% if result %}
+<section class="card import-apply-result">
+    <div class="card-header">
+        <h3>Resumen de limpieza</h3>
+    </div>
+    <div class="card-body import-result-grid">
+        <div><span>Muestras borradas</span><strong>{{ result.samples }}</strong></div>
+        <div><span>Catas borradas</span><strong>{{ result.tastings }}</strong></div>
+        <div><span>Documentos/fotos borrados</span><strong>{{ result.documents }}</strong></div>
+        <div><span>Archivos de fotos borrados</span><strong>{{ result.photos }}</strong></div>
+        <div><span>Envios borrados</span><strong>{{ result.shipments }}</strong></div>
+        <div><span>Eventos borrados</span><strong>{{ result.events }}</strong></div>
+        <div><span>Import rows desvinculadas</span><strong>{{ result.import_rows }}</strong></div>
+    </div>
+</section>
+{% endif %}
+
+<div class="page-grid">
+    <section class="card form-view">
+        <div class="section-header">
+            <div>
+                <span class="eyebrow">Confirmacion requerida</span>
+                <h3>Borrado irreversible de muestras</h3>
+            </div>
+        </div>
+        <form method="post" action="/admin/clean-samples" onsubmit="return confirm('Esta accion borrara todas las muestras y datos asociados. ¿Continuar?');">
+            <div class="form-group">
+                <label>Escribe exactamente: BORRAR MUESTRAS</label>
+                <input type="text" name="confirmation" autocomplete="off" required>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-danger" type="submit"><i class="fa-solid fa-trash"></i> Limpiar todas las muestras</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="card">
+        <div class="card-header">
+            <h3>Estado actual</h3>
+        </div>
+        <div class="card-body import-result-grid">
+            <div><span>Muestras</span><strong>{{ summary.samples }}</strong></div>
+            <div><span>Catas</span><strong>{{ summary.tastings }}</strong></div>
+            <div><span>Documentos/fotos</span><strong>{{ summary.documents }}</strong></div>
+            <div><span>Envios</span><strong>{{ summary.shipments }}</strong></div>
+            <div><span>Eventos</span><strong>{{ summary.events }}</strong></div>
+            <div><span>Import rows vinculadas</span><strong>{{ summary.import_rows }}</strong></div>
+            <div><span>Batches conservados</span><strong>{{ summary.batches }}</strong></div>
+        </div>
+    </section>
+</div>
+{% endblock %}

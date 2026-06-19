@@ -35,7 +35,32 @@ make run
 ### Docker
 
 ```bash
-docker-compose up
+docker compose up --build
+```
+
+El servicio queda escuchando en `0.0.0.0:8000` dentro del contenedor y se publica en el puerto `8000` del equipo servidor.
+Desde otro portatil de la misma red se accede con:
+
+```text
+http://IP_DEL_PC_SERVIDOR:8000
+```
+
+Para que los QR de las etiquetas abran una URL util desde moviles u otros portatiles, configura `APP_BASE_URL` con la URL real del servidor:
+
+```bash
+APP_BASE_URL=http://192.168.1.100:8000
+```
+
+En un despliegue futuro:
+
+```bash
+APP_BASE_URL=https://muestras.indianecotrade.es
+```
+
+Los QR de etiquetas apuntan a la ficha publica de solo lectura:
+
+```text
+{APP_BASE_URL}/public/samples/{sample_id}
 ```
 
 ### Tests

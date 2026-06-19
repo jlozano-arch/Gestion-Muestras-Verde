@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Muestra {{ sample.code or sample.supplier_reference or sample.id }}{% endblock %}
+
+{% block content %}
+<section class="sample-hero public-sample-hero">
+    <div class="sample-hero-main">
+        <span class="eyebrow"><i class="fa-solid fa-qrcode"></i> Ficha publica de muestra</span>
+        <h2>{{ display_value(sample.code, display_value(sample.supplier_reference, '#' ~ sample.id)) }}</h2>
+        <p class="lead">{{ sample_country_display(sample) or display_value(sample.origin) }} · {{ display_value(sample.producer) }}</p>
+        <div class="sample-hero-meta">
+            <span class="status-badge status-{{ status_class(sample.status) }}">{{ status_label(sample.status) }}</span>
+            {% if sample.purchase_contract_cvc %}<span><i class="fa-solid fa-file-signature"></i> CVC {{ sample.purchase_contract_cvc }}</span>{% endif %}
+            {% if sample.supplier_reference %}<span><i class="fa-solid fa-barcode"></i> Ref. {{ sample.supplier_reference }}</span>{% endif %}
+        </div>
+    </div>
+</section>
+
+<div class="page-grid">
+    <section class="card">
+        <div class="card-header">
+            <h3>Datos de muestra</h3>
+        </div>
+        <div class="card-body">
+            <div class="data-matrix">
+                <div><span>Codigo</span><strong>{{ display_value(sample.code) }}</strong></div>
+                <div><span>Pais / origen</span><strong>{{ sample_country_display(sample) or display_value(sample.origin) }}</strong></div>
+                <div><span>Proveedor</span><strong>{{ display_value(sample.producer) }}</strong></div>
+                <div><span>Ref. proveedor</span><strong>{{ display_value(sample.supplier_reference) }}</strong></div>
+                <div><span>CVC</span><strong>{{ display_value(sample.purchase_contract_cvc) }}</strong></div>
+                <div><span>Calidad</span><strong>{{ display_value(sample.quality) }}</strong></div>
+            </div>
+            {% if sample.notes %}
+            <div class="notes-section">
+                <strong>Notas</strong>
+                <p>{{ sample.notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="card-header">
+            <h3>Ultima cata</h3>
+        </div>
+        <div class="card-body">
+            {% if latest_tasting %}
+            <div class="score-display">
+                <div class="score-card"><span class="score-label">Indian Score</span><span class="score-value">{{ "%.1f"|format(latest_tasting.indian_score or 0) }}</span></div>
+                <div class="score-card"><span class="score-label">Taza</span><span class="score-value">{{ "%.1f"|format(latest_tasting.cup_score or 0) }}</span></div>
+                <div class="score-card"><span class="score-label">Resultado</span><span class="score-value">{{ tasting_result_label(latest_tasting.result) }}</span></div>
+            </div>
+            {% if latest_tasting.tasting_notes %}
+            <div class="notes-section">
+                <strong>Notas de cata</strong>
+                <p>{{ latest_tasting.tasting_notes }}</p>
+            </div>
+            {% endif %}
+            {% else %}
+            <p class="empty">Todavia no hay cata registrada para esta muestra.</p>
+            {% endif %}
+        </div>
+    </section>
+</div>
+
+<section class="card">
+    <div class="card-header">
+        <h3>Fotografias y documentos</h3>
+    </div>
+    <div class="card-body">
+        {% if documents %}
+        <div class="documents-grid">
+            {% for item in documents %}
+            <article class="document-card gallery-card">
+                <div class="gallery-thumb">
+                    {% if item.is_image %}
+                    <img src="{{ item.url }}" alt="{{ item.doc.file_name }}">
+                    {% else %}
+                    <i class="fa-solid fa-file-lines"></i>
+                    {% endif %}
+                </div>
+                <div>
+                    <p class="doc-name"><a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.doc.file_name }}</a></p>
+                    <small>{{ item.doc.file_type or 'documento' }}</small>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty">No hay fotografias o documentos publicos para esta muestra.</p>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

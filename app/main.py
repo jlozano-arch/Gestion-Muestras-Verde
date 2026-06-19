@@ -214,6 +214,31 @@ templates.env.globals["display_value"] = display_value
 templates.env.globals["logo_exists"] = logo_exists
 
 
+def _public_base_url(request: Request) -> str:
+    configured = os.getenv("APP_BASE_URL")
+    if configured:
+        return configured.rstrip("/")
+    return str(request.base_url).rstrip("/")
+
+
+def _public_sample_url(request: Request, sample_id: int) -> str:
+    return f"{_public_base_url(request)}/public/samples/{sample_id}"
+
+
+def _document_public_url(doc: Document) -> str:
+    if not doc.file_path:
+        return ""
+    try:
+        uploads_root = Path(UPLOADS_DIR).resolve()
+        target = Path(doc.file_path).resolve()
+        if uploads_root == target or uploads_root not in target.parents:
+            return ""
+        relative = target.relative_to(uploads_root).as_posix()
+        return f"/uploads/{relative}"
+    except Exception:
+        return ""
+
+
 def _safe_delete_upload_file(file_path):
     if not file_path:
         return False
@@ -230,7 +255,13 @@ def _safe_delete_upload_file(file_path):
         return False
 
 
-def _delete_sample_records(db: Session, sample: Sample, import_final_action: str = None, import_batch_id: int = None):
+def _delete_sample_records(
+    db: Session,
+    sample: Sample,
+    import_final_action: str = None,
+    import_batch_id: int = None,
+    import_status: str = "deleted",
+):
     """Delete a sample plus dependent records and clear staged import references."""
     documents = db.query(Document).filter(Document.sample_id == sample.id).all()
     deleted_files = 0
@@ -254,7 +285,7 @@ def _delete_sample_records(db: Session, sample: Sample, import_final_action: str
         row.sample_id = None
         if import_final_action:
             row.final_action = import_final_action
-            row.status = "deleted"
+            row.status = import_status
 
     db.query(Document).filter(Document.sample_id == sample.id).delete(synchronize_session=False)
     db.query(Event).filter(Event.sample_id == sample.id).delete(synchronize_session=False)
@@ -340,6 +371,41 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
 # ============================================================================
 # SAMPLE MANAGEMENT
 # ============================================================================
+
+@app.get("/public/samples/{sample_id}", response_class=HTMLResponse)
+async def public_sample_detail(sample_id: int, request: Request, db: Session = Depends(get_db)):
+    sample = db.query(Sample).filter(Sample.id == sample_id).first()
+    if not sample:
+        raise HTTPException(status_code=404, detail="Muestra no encontrada")
+
+    latest_tasting = db.query(Tasting).filter(
+        Tasting.sample_id == sample_id
+    ).order_by(desc(Tasting.tasting_date), desc(Tasting.created_at)).first()
+    documents = db.query(Document).filter(Document.sample_id == sample_id).order_by(desc(Document.upload_date)).all()
+    public_documents = []
+    for doc in documents:
+        url = _document_public_url(doc)
+        if not url:
+            continue
+        file_name = (doc.file_name or "").lower()
+        is_image = bool(
+            (doc.file_type and doc.file_type.startswith("image"))
+            or file_name.endswith((".png", ".jpg", ".jpeg", ".webp"))
+        )
+        public_documents.append({
+            "doc": doc,
+            "url": url,
+            "is_image": is_image,
+        })
+
+    return templates.TemplateResponse("public_sample.html", {
+        "request": request,
+        "sample": sample,
+        "latest_tasting": latest_tasting,
+        "documents": public_documents,
+        "public_url": _public_sample_url(request, sample.id),
+    })
+
 
 @app.get("/samples", response_class=HTMLResponse)
 async def list_samples(
@@ -1621,7 +1687,6 @@ def _render_avery_l7108rev_sheet(samples, request: Request, copies: int = 1, sta
     page_size = A4
     c = canvas.Canvas(pdf_buffer, pagesize=page_size)
     page_width, page_height = page_size
-    base = os.getenv('APP_BASE_URL') or str(request.base_url)
 
     slots = []
     for row in range(layout["rows"]):
@@ -1637,7 +1702,7 @@ def _render_avery_l7108rev_sheet(samples, request: Request, copies: int = 1, sta
                 c.showPage()
                 current_slot = 0
             x, y = slots[current_slot]
-            qr_data = f"{base.rstrip('/')}/samples/{sample.id}"
+            qr_data = _public_sample_url(request, sample.id)
             c.saveState()
             c.translate(x + layout["cell_width"], y)
             c.rotate(90)
@@ -1703,10 +1768,7 @@ async def generate_label_old(sample_id: int, request: Request, db: Session = Dep
     if not sample:
         raise HTTPException(status_code=404, detail="Muestra no encontrada")
 
-    base = os.getenv('APP_BASE_URL')
-    if not base:
-        base = str(request.base_url)
-    qr_data = f"{base.rstrip('/')}/samples/{sample_id}"
+    qr_data = _public_sample_url(request, sample_id)
     qr = qrcode.QRCode(version=1, box_size=4, border=1)
     qr.add_data(qr_data)
     qr.make(fit=True)
@@ -2035,6 +2097,96 @@ def _skip_action_for_import_row(row: ImportRow):
 async def imports_index(request: Request, db: Session = Depends(get_db)):
     batches = db.query(ImportBatch).order_by(desc(ImportBatch.created_at)).limit(25).all()
     return templates.TemplateResponse("imports.html", {"request": request, "batches": batches})
+
+
+def _clean_all_samples(db: Session) -> dict:
+    samples = db.query(Sample).all()
+    summary = {
+        "samples": len(samples),
+        "tastings": 0,
+        "documents": 0,
+        "photos": 0,
+        "shipments": 0,
+        "events": 0,
+        "import_rows": 0,
+    }
+    sample_ids = [sample.id for sample in samples]
+    if sample_ids:
+        summary["import_rows"] = db.query(ImportRow).filter(ImportRow.sample_id.in_(sample_ids)).count()
+    for sample in samples:
+        counts = _delete_sample_records(
+            db,
+            sample,
+            import_final_action="CLEANED_SAMPLE",
+            import_status="CLEANED_SAMPLE",
+        )
+        summary["tastings"] += counts["tastings"]
+        summary["documents"] += counts["documents"]
+        summary["photos"] += counts["files"]
+        summary["shipments"] += counts["shipments"]
+        summary["events"] += counts["events"]
+    return summary
+
+
+@app.get("/admin/clean-samples", response_class=HTMLResponse)
+async def admin_clean_samples_form(request: Request, db: Session = Depends(get_db)):
+    summary = {
+        "samples": db.query(Sample).count(),
+        "tastings": db.query(Tasting).count(),
+        "documents": db.query(Document).count(),
+        "shipments": db.query(Shipment).count(),
+        "events": db.query(Event).count(),
+        "import_rows": db.query(ImportRow).filter(ImportRow.sample_id.isnot(None)).count(),
+        "batches": db.query(ImportBatch).count(),
+    }
+    return templates.TemplateResponse("admin_clean_samples.html", {
+        "request": request,
+        "summary": summary,
+        "result": None,
+        "error": None,
+    })
+
+
+@app.post("/admin/clean-samples", response_class=HTMLResponse)
+async def admin_clean_samples_execute(
+    request: Request,
+    confirmation: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    summary = {
+        "samples": db.query(Sample).count(),
+        "tastings": db.query(Tasting).count(),
+        "documents": db.query(Document).count(),
+        "shipments": db.query(Shipment).count(),
+        "events": db.query(Event).count(),
+        "import_rows": db.query(ImportRow).filter(ImportRow.sample_id.isnot(None)).count(),
+        "batches": db.query(ImportBatch).count(),
+    }
+    if confirmation != "BORRAR MUESTRAS":
+        return templates.TemplateResponse("admin_clean_samples.html", {
+            "request": request,
+            "summary": summary,
+            "result": None,
+            "error": "La confirmacion no coincide. Escribe exactamente BORRAR MUESTRAS.",
+        }, status_code=400)
+
+    result = _clean_all_samples(db)
+    db.commit()
+    post_summary = {
+        "samples": db.query(Sample).count(),
+        "tastings": db.query(Tasting).count(),
+        "documents": db.query(Document).count(),
+        "shipments": db.query(Shipment).count(),
+        "events": db.query(Event).count(),
+        "import_rows": db.query(ImportRow).filter(ImportRow.sample_id.isnot(None)).count(),
+        "batches": db.query(ImportBatch).count(),
+    }
+    return templates.TemplateResponse("admin_clean_samples.html", {
+        "request": request,
+        "summary": post_summary,
+        "result": result,
+        "error": None,
+    })
 
 
 @app.post("/imports/preview")
