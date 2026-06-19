@@ -129,6 +129,28 @@ def display_value(value, default="-"):
     return text
 
 
+def _data_option_label(value) -> str:
+    label = display_value(value, "")
+    if not label:
+        return ""
+    return re.sub(r"\s+", " ", label).strip()
+
+
+def _sample_field_options(db: Session, field_name: str) -> list[dict]:
+    seen = {}
+    for (value,) in db.query(getattr(Sample, field_name)).distinct().all():
+        label = _data_option_label(value)
+        if not label:
+            continue
+        key = _normalize_origin_key(label)
+        if key and key not in seen:
+            seen[key] = label
+    return [
+        {"value": label, "label": label}
+        for label in sorted(seen.values(), key=lambda value: _normalize_origin_key(value))
+    ]
+
+
 def _origin_country_candidate(origin) -> str:
     key = _normalize_origin_key(origin)
     if not key:
@@ -383,6 +405,9 @@ async def list_samples(
         "request": request,
         "samples": samples,
         "country_options": _sample_country_options(db),
+        "provider_options": _sample_field_options(db, "producer"),
+        "quality_options": _sample_field_options(db, "quality"),
+        "origin_options": _sample_field_options(db, "origin"),
         "statuses": [{"value": s.value, "label": status_label(s.value)} for s in SampleStatus],
         "message": message,
         "filters": {

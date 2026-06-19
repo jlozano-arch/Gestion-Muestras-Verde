@@ -43,11 +43,21 @@
         </div>
         <div>
             <label>Origen</label>
-            <input type="search" name="origin" value="{{ filters.origin if filters else '' }}" placeholder="Origen, finca o region">
+            <select name="origin">
+                <option value="">Todos los origenes</option>
+                {% for origin in origin_options %}
+                    <option value="{{ origin.value }}" {% if filters and filters.origin == origin.value %}selected{% endif %}>{{ origin.label }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div>
             <label>Proveedor</label>
-            <input type="search" name="producer" value="{{ filters.producer if filters else '' }}" placeholder="Proveedor">
+            <select name="producer">
+                <option value="">Todos los proveedores</option>
+                {% for provider in provider_options %}
+                    <option value="{{ provider.value }}" {% if filters and filters.producer == provider.value %}selected{% endif %}>{{ provider.label }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div>
             <label>Ref. proveedor</label>
@@ -55,7 +65,12 @@
         </div>
         <div>
             <label>Calidad</label>
-            <input type="search" name="quality" value="{{ filters.quality if filters else '' }}" placeholder="Calidad">
+            <select name="quality">
+                <option value="">Todas las calidades</option>
+                {% for quality in quality_options %}
+                    <option value="{{ quality.value }}" {% if filters and filters.quality == quality.value %}selected{% endif %}>{{ quality.label }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div>
             <label>Estado</label>
