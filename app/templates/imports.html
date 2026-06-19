@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Importaciones Excel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <span class="eyebrow"><i class="fa-solid fa-file-excel"></i> Importaciones</span>
+        <h2>Previsualizar importacion Excel</h2>
+        <p class="lead">Sube un Excel para validar filas, duplicados y coincidencias antes de crear o actualizar muestras. Se procesan Robusta America, Robusta Africa, Robusta Asia y Descafeinados.</p>
+    </div>
+</div>
+
+<div class="page-grid">
+    <section class="card form-view">
+        <form method="post" action="/imports/preview" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>Archivo Excel</label>
+                <input type="file" name="file" accept=".xlsx" required>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" type="submit"><i class="fa-solid fa-eye"></i> Previsualizar</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="card">
+        <div class="card-header">
+            <h3>Ultimas importaciones</h3>
+        </div>
+        <div class="card-body table-responsive">
+            {% if batches %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Archivo</th>
+                        <th>Estado</th>
+                        <th>Filas</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for batch in batches %}
+                    <tr>
+                        <td><a href="/imports/{{ batch.id }}">#{{ batch.id }}</a></td>
+                        <td>{{ batch.filename }}</td>
+                        <td>{{ batch.status }}</td>
+                        <td>{{ batch.total_rows }}</td>
+                        <td>{{ batch.created_at.strftime('%d/%m/%Y %H:%M') if batch.created_at else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty">Todavia no hay importaciones en staging.</p>
+            {% endif %}
+        </div>
+    </section>
+</div>
+{% endblock %}

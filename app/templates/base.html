@@ -8,53 +8,37 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-nx6qozx18aQ5Sw+IGYTLk2Z6l3ZBzONbp8cVFceiqGQpM/hjD/tZPZ6j9aHWnAVulhXc0j3ZxL0XYxM6Gr5v0A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
     {% block extra_css %}{% endblock %}
 </head>
 <body class="app-shell">
     <header class="topbar">
         <div class="topbar-inner">
-            <div class="brand">
+            <a href="/" class="brand">
                 {% if logo_exists %}
                 <img src="{{ url_for('static', path='logo.png') }}" alt="Indian Ecotrade" class="brand-logo">
                 {% endif %}
                 <div class="brand-title">
-                    <h1>Indian Ecotrade</h1>
-                    <p>Panel de gestión de café verde</p>
+                    <span class="brand-label">Indian Ecotrade</span>
+                    <h1>Gestión de Café Verde</h1>
                 </div>
-            </div>
-            <nav>
+            </a>
+            <nav class="topbar-nav-wrap" aria-label="Menú principal">
                 <ul class="topbar-nav">
-                    <li><a class="topbar-link" href="/"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
-                    <li><a class="topbar-link" href="/samples"><i class="fa-solid fa-cubes-stacked"></i> Muestras</a></li>
-                    <li><a class="topbar-link" href="/labels"><i class="fa-solid fa-tag"></i> Etiquetas</a></li>
-                    <li><a class="topbar-link" href="/samples/new"><i class="fa-solid fa-plus-circle"></i> Nueva Muestra</a></li>
-                    <li><a class="topbar-link" href="/compare"><i class="fa-solid fa-scale-balanced"></i> Comparador</a></li>
-                    <li><a class="topbar-link" href="#configuracion"><i class="fa-solid fa-gear"></i> Configuración</a></li>
+                    <li><a class="topbar-link{% if request.url.path == '/' %} active{% endif %}" href="/" aria-current="{% if request.url.path == '/' %}page{% endif %}"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+                    <li><a class="topbar-link{% if request.url.path.startswith('/samples') and request.url.path != '/samples/new' %} active{% endif %}" href="/samples"><i class="fa-solid fa-cubes-stacked"></i> Muestras</a></li>
+                    <li><a class="topbar-link{% if request.url.path == '/labels' %} active{% endif %}" href="/labels"><i class="fa-solid fa-tag"></i> Etiquetas</a></li>
+                    <li><a class="topbar-link{% if request.url.path.startswith('/imports') %} active{% endif %}" href="/imports"><i class="fa-solid fa-file-excel"></i> Importaciones</a></li>
+                    <li><a class="topbar-link{% if request.url.path == '/samples/new' %} active{% endif %}" href="/samples/new"><i class="fa-solid fa-plus-circle"></i> Nueva muestra</a></li>
+                    <li><a class="topbar-link{% if request.url.path == '/compare' %} active{% endif %}" href="/compare"><i class="fa-solid fa-scale-balanced"></i> Comparador</a></li>
                 </ul>
             </nav>
         </div>
     </header>
 
-    <main class="container">
+    <main class="page-container">
         {% block content %}{% endblock %}
     </main>
-
-    <section id="configuracion" class="config-panel card">
-        <div class="card-header">
-            <div>
-                <h3>Configuración general</h3>
-                <p>Accede a ajustes globales de la aplicación y la visualización de informes desde este panel central.</p>
-            </div>
-        </div>
-        <div class="card-body">
-            <div class="config-grid">
-                <div class="config-card"><strong>Empresa</strong><p>Indian Ecotrade</p></div>
-                <div class="config-card"><strong>Sector</strong><p>Trading de café verde</p></div>
-                <div class="config-card"><strong>Temática</strong><p>Gestión de muestras y laboratorio</p></div>
-            </div>
-        </div>
-    </section>
 
     <footer class="footer">
         <p>&copy; 2026 Indian Ecotrade. Gestión de Café Verde.</p>

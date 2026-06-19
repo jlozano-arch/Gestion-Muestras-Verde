@@ -48,6 +48,7 @@ def create_tables():
             extras = {
                 'supplier_reference': 'TEXT',
                 'provider_sample_number': 'TEXT',
+                'container_number': 'TEXT',
                 'purchase_contract_cvc': 'TEXT',
                 'sales_contract_cvv': 'TEXT',
                 'quality': 'TEXT',
@@ -131,6 +132,27 @@ def create_tables():
                             logger.info(f"Added column {col} to samples")
                         except Exception:
                             logger.exception(f"Failed to add column {col} to samples")
+
+                try:
+                    conn.exec_driver_sql("""
+                        UPDATE samples
+                        SET status = CASE
+                            WHEN lower(status) IN ('received', 'recibida', 'pending', 'pendiente') THEN 'received'
+                            WHEN lower(status) IN ('available', 'disponible') THEN 'available'
+                            WHEN lower(status) IN ('approved', 'aprobada', 'evaluated', 'evaluada', 'purchased') THEN 'approved'
+                            WHEN lower(status) IN ('rejected', 'rechazada') THEN 'rejected'
+                            WHEN lower(status) IN ('shipped', 'enviada', 'exhausted', 'agotada') THEN 'shipped'
+                            WHEN lower(status) IN ('archived', 'archivada') THEN 'archived'
+                            WHEN lower(status) = 'partially_shipped' AND COALESCE(available_quantity_g, 0) > 0 THEN 'available'
+                            WHEN lower(status) = 'partially_shipped' THEN 'shipped'
+                            WHEN lower(status) = 'analyzing' THEN 'received'
+                            ELSE 'received'
+                        END
+                        WHERE status IS NOT NULL
+                    """)
+                    conn.commit()
+                except Exception:
+                    logger.exception("Failed to normalize sample statuses")
             except Exception:
                 logger.exception("Failed to inspect/modify samples table")
 
@@ -146,5 +168,28 @@ def create_tables():
                         logger.exception("Failed to add quantity_g to shipments")
             except Exception:
                 logger.exception("Failed to inspect/modify shipments table")
+
+            # Ensure import staging rows have decision/apply metadata
+            try:
+                res_import_rows = conn.exec_driver_sql("PRAGMA table_info('import_rows')")
+                existing_import_rows = {row[1] for row in res_import_rows.fetchall()}
+                import_row_extras = {
+                    'source_sheet': 'TEXT',
+                    'final_action': 'TEXT',
+                    'status': 'TEXT',
+                    'sample_id': 'INTEGER',
+                    'before_snapshot_json': 'TEXT',
+                    'after_snapshot_json': 'TEXT',
+                }
+                if existing_import_rows:
+                    for col, coltype in import_row_extras.items():
+                        if col not in existing_import_rows:
+                            try:
+                                conn.exec_driver_sql(f"ALTER TABLE import_rows ADD COLUMN {col} {coltype}")
+                                logger.info(f"Added column {col} to import_rows")
+                            except Exception:
+                                logger.exception(f"Failed to add {col} to import_rows")
+            except Exception:
+                logger.exception("Failed to inspect/modify import_rows table")
     except Exception:
         logging.exception("Unexpected error running migrations in create_tables")

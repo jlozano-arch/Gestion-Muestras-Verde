@@ -10,10 +10,9 @@ from .database import Base
 class SampleStatus(str, enum.Enum):
     """Sample status enumeration"""
     RECEIVED = "received"
-    ANALYZING = "analyzing"
-    EVALUATED = "evaluated"
     AVAILABLE = "available"
-    PARTIALLY_SHIPPED = "partially_shipped"
+    APPROVED = "approved"
+    REJECTED = "rejected"
     SHIPPED = "shipped"
     ARCHIVED = "archived"
 
@@ -30,6 +29,7 @@ class Sample(Base):
     producer = Column(String(200))
     supplier_reference = Column(String(200))
     provider_sample_number = Column(String(200))
+    container_number = Column(String(100))
     purchase_contract_cvc = Column(String(100))
     sales_contract_cvv = Column(String(100))
     quality = Column(String(100))
@@ -47,7 +47,13 @@ class Sample(Base):
     # New gram-based fields
     received_quantity_g = Column(Integer, default=0)
     available_quantity_g = Column(Integer, default=0)
-    status = Column(Enum(SampleStatus), default=SampleStatus.RECEIVED)
+    status = Column(
+        Enum(
+            SampleStatus,
+            values_callable=lambda statuses: [status.value for status in statuses],
+        ),
+        default=SampleStatus.RECEIVED,
+    )
     notes = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -174,3 +180,53 @@ class Document(Base):
     # Relationships
     sample = relationship("Sample", back_populates="documents")
     tasting = relationship("Tasting", back_populates="documents")
+
+
+class ImportBatch(Base):
+    """Excel import batch staged for preview before applying changes."""
+    __tablename__ = "import_batches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(255))
+    stored_file_path = Column(String(500))
+    file_hash = Column(String(128), index=True)
+    status = Column(String(50), default="preview", index=True)
+    total_rows = Column(Integer, default=0)
+    create_count = Column(Integer, default=0)
+    existing_count = Column(Integer, default=0)
+    duplicate_count = Column(Integer, default=0)
+    incomplete_count = Column(Integer, default=0)
+    warning_count = Column(Integer, default=0)
+    error_count = Column(Integer, default=0)
+    created_by = Column(String(200), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    applied_at = Column(DateTime, nullable=True)
+    rolled_back_at = Column(DateTime, nullable=True)
+
+    rows = relationship("ImportRow", back_populates="batch", cascade="all, delete-orphan")
+
+
+class ImportRow(Base):
+    """Normalized Excel row staged inside an import batch."""
+    __tablename__ = "import_rows"
+
+    id = Column(Integer, primary_key=True, index=True)
+    batch_id = Column(Integer, ForeignKey("import_batches.id"), index=True)
+    row_number = Column(Integer)
+    source_sheet = Column(String(80), index=True)
+    raw_data_json = Column(Text)
+    normalized_data_json = Column(Text)
+    identity_key = Column(String(500), index=True)
+    identity_level = Column(String(50))  # primary_cvc, secondary_reference, incomplete
+    proposed_action = Column(String(50), index=True)
+    final_action = Column(String(50), nullable=True)
+    status = Column(String(50), index=True)
+    sample_id = Column(Integer, ForeignKey("samples.id"), nullable=True)
+    errors_json = Column(Text)
+    warnings_json = Column(Text)
+    before_snapshot_json = Column(Text, nullable=True)
+    after_snapshot_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    batch = relationship("ImportBatch", back_populates="rows")
+    sample = relationship("Sample")

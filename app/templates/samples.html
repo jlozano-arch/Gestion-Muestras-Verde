@@ -1,67 +1,94 @@
 {% extends "base.html" %}
 
-{% block title %}Muestras - Gestión de Café Verde{% endblock %}
+{% block title %}Muestras - Gestion de Café Verde{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div>
         <span class="eyebrow"><i class="fa-solid fa-cube"></i> Inventario</span>
         <h2>Listado de muestras</h2>
-        <p class="lead">Filtra y explora tus lotes de café verde rápidamente, con métricas claras y acciones directas en un solo lugar.</p>
+        <p class="lead">Filtra y explora tus lotes de cafe verde rapidamente, con metricas claras y acciones directas en un solo lugar.</p>
     </div>
     <div class="page-actions">
-           <a href="/samples/new" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Nueva muestra</a>
-           <a href="#" id="print-selected" class="btn btn-secondary"><i class="fa-solid fa-print"></i> Imprimir etiqueta</a>
+        <a href="/samples/new" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Nueva muestra</a>
+        <a href="#" id="print-selected" class="btn btn-secondary"><i class="fa-solid fa-print"></i> Imprimir etiqueta</a>
+        <button type="submit" form="samples-bulk-delete-form" id="delete-selected" class="btn btn-danger"><i class="fa-solid fa-trash"></i> Eliminar seleccionadas</button>
     </div>
 </div>
+
+{% if message %}
+<section class="app-message success">
+    <i class="fa-solid fa-circle-check"></i> {{ message }}
+</section>
+{% endif %}
 
 <div class="filters card">
     <form method="get" class="filter-form">
         <div>
-            <label>Estado</label>
-            <select name="status" onchange="this.form.submit()">
-                <option value="">Todos los estados</option>
-                {% for s in statuses %}
-                    <option value="{{ s.value }}">{{ s.label }}</option>
+            <label>Código</label>
+            <input type="search" name="code" value="{{ filters.code if filters else '' }}" placeholder="Código muestra">
+        </div>
+        <div>
+            <label>CVC</label>
+            <input type="search" name="purchase_cvc" value="{{ filters.purchase_cvc if filters else '' }}" placeholder="Contrato CVC">
+        </div>
+        <div>
+            <label>Pais</label>
+            <select name="country">
+                <option value="">Todos los paises</option>
+                {% for code, country in countries.items() %}
+                    <option value="{{ code }}" {% if filters and filters.country == code %}selected{% endif %}>{{ country.flag }} {{ country.name }}</option>
                 {% endfor %}
             </select>
         </div>
         <div>
-            <label>País</label>
-            <select name="country" onchange="this.form.submit()">
-                <option value="">Todos los países</option>
-                {% for code, country in countries.items() %}
-                    <option value="{{ code }}">{{ country.flag }} {{ country.name }}</option>
+            <label>Origen</label>
+            <input type="search" name="origin" value="{{ filters.origin if filters else '' }}" placeholder="Origen, finca o region">
+        </div>
+        <div>
+            <label>Proveedor</label>
+            <input type="search" name="producer" value="{{ filters.producer if filters else '' }}" placeholder="Proveedor">
+        </div>
+        <div>
+            <label>Ref. proveedor</label>
+            <input type="search" name="supplier_reference" value="{{ filters.supplier_reference if filters else '' }}" placeholder="Referencia">
+        </div>
+        <div>
+            <label>Calidad</label>
+            <input type="search" name="quality" value="{{ filters.quality if filters else '' }}" placeholder="Calidad">
+        </div>
+        <div>
+            <label>Estado</label>
+            <select name="status">
+                <option value="">Todos los estados</option>
+                {% for s in statuses %}
+                    <option value="{{ s.value }}" {% if filters and filters.status == s.value %}selected{% endif %}>{{ s.label }}</option>
                 {% endfor %}
             </select>
+        </div>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button>
+            <a href="/samples" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i> Limpiar</a>
         </div>
     </form>
 </div>
 
 <div class="card">
     <div class="card-header">
-            {% block extra_js %}
-            <script>
-            document.querySelectorAll('.label-check');
-            document.getElementById('print-selected').addEventListener('click', () => {
-                const ids = Array.from(document.querySelectorAll('.label-check:checked')).map(c => c.value);
-                if (!ids.length) return alert('Selecciona al menos una muestra');
-                ids.forEach(id => window.open(`/samples/${id}/label`, '_blank'));
-            });
-            </script>
-            {% endblock %}
         <h3>Muestras</h3>
     </div>
     <div class="card-body">
         {% if samples %}
         <div class="table-responsive">
+            <form id="samples-bulk-delete-form" method="post" action="/samples/delete-selected">
             <table class="table">
                 <thead>
                     <tr>
                         <th>Código</th>
-                        <th>País</th>
+                        <th>Pais</th>
                         <th>Origen</th>
                         <th>Variedad</th>
+                        <th>CVC</th>
                         <th>Disponible</th>
                         <th>Estado</th>
                         <th>Acciones</th>
@@ -70,21 +97,50 @@
                 <tbody>
                     {% for sample in samples %}
                     <tr>
-                    <td><input type="checkbox" class="label-check" value="{{ sample.id }}"> <a href="/samples/{{ sample.id }}">{{ sample.code }}</a></td>
+                        <td><input type="checkbox" class="label-check" name="sample_ids" value="{{ sample.id }}"> <a href="/samples/{{ sample.id }}">{{ sample.code }}</a></td>
                         <td>{{ sample.country_name }}</td>
                         <td>{{ sample.origin }}</td>
                         <td>{{ sample.variety }}</td>
+                        <td>{{ sample.purchase_contract_cvc or '-' }}</td>
                         <td>{{ sample.available_quantity_g }} g</td>
-                        <td><span class="status-badge status-{{ sample.status.value|lower|replace(' ', '-') }}">{{ status_label(sample.status.value) }}</span></td>
+                        <td><span class="status-badge status-{{ status_class(sample.status) }}">{{ status_label(sample.status) }}</span></td>
                         <td><a href="/samples/{{ sample.id }}" class="btn btn-small btn-secondary"><i class="fa-solid fa-arrow-right"></i> Detalle</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+            </form>
         </div>
         {% else %}
             <p class="empty">No hay muestras con estos filtros</p>
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('print-selected').addEventListener('click', (event) => {
+    event.preventDefault();
+    const ids = Array.from(document.querySelectorAll('.label-check:checked')).map((checkbox) => checkbox.value);
+    if (!ids.length) {
+        alert('Selecciona al menos una muestra');
+        return;
+    }
+    window.open(`/labels?ids=${ids.join(',')}`, '_blank');
+});
+
+document.getElementById('samples-bulk-delete-form')?.addEventListener('submit', (event) => {
+    const ids = Array.from(document.querySelectorAll('.label-check:checked')).map((checkbox) => checkbox.value);
+    if (!ids.length) {
+        event.preventDefault();
+        alert('Selecciona al menos una muestra para eliminar');
+        return;
+    }
+    const message = `Vas a eliminar ${ids.length} muestra(s). Se borraran tambien sus catas, documentos, fotos, envios y eventos. Esta accion es irreversible. ¿Continuar?`;
+    if (!confirm(message)) {
+        event.preventDefault();
+    }
+});
+</script>
 {% endblock %}

@@ -3,224 +3,232 @@
 {% block title %}{{ sample.code }} - Detalle de Muestra{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div>
-        <span class="eyebrow"><i class="fa-solid fa-magnifying-glass-chart"></i> Detalle</span>
+<section class="sample-hero">
+    <div class="sample-hero-main">
+        <span class="eyebrow"><i class="fa-solid fa-flask-vial"></i> Ficha tecnica</span>
         <h2>{{ sample.code }}</h2>
-        <p class="lead">Vista detallada del lote de café verde con todas las catas, envíos y documentos disponibles en una sola experiencia.</p>
+        <p class="lead">{{ sample.origin or '-' }}, {{ sample.country_name or '-' }} - {{ sample.producer or '-' }}</p>
+        <div class="sample-hero-meta">
+            <span class="status-badge status-{{ status_class(sample.status) }}">{{ status_label(sample.status) }}</span>
+            <span><i class="fa-solid fa-boxes-stacked"></i> {{ sample.available_quantity_g or 0 }} / {{ sample.received_quantity_g or 0 }} g</span>
+            {% if sample.container_number %}<span><i class="fa-solid fa-box"></i> Contenedor {{ sample.container_number }}</span>{% endif %}
+        </div>
     </div>
     <div class="page-actions">
         <a href="/samples/{{ sample.id }}/label" class="btn btn-secondary" target="_blank"><i class="fa-solid fa-file-pdf"></i> Etiqueta PDF</a>
         <a href="/samples/{{ sample.id }}/edit" class="btn btn-secondary"><i class="fa-solid fa-pen-to-square"></i> Editar muestra</a>
+        <form method="post" action="/samples/{{ sample.id }}/delete" onsubmit="return confirm('Esta accion eliminara la muestra y sus catas, documentos, fotos, envios y eventos. ¿Continuar?');">
+            <button type="submit" class="btn btn-danger"><i class="fa-solid fa-trash"></i> Eliminar muestra</button>
+        </form>
         <a href="/samples" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Volver</a>
     </div>
-</div>
+</section>
 
-<div class="sample-detail-view card">
-    <div class="sample-header">
-        <div class="sample-title">
-            <div class="sample-chip"><span class="country-flag">{{ flag }}</span></div>
-            <div>
-                <p class="eyebrow"><i class="fa-solid fa-certificate"></i> Código de muestra</p>
-                <h2>{{ sample.code }}</h2>
-                <p class="lead">{{ sample.origin }}, {{ sample.country_name }} • {{ sample.producer }}</p>
-            </div>
-        </div>
-        <div class="sample-meta">
-            <span class="status-badge status-{{ sample.status.value|lower|replace(' ', '-') }}">{{ status_label(sample.status.value) }}</span>
-            <div class="sample-summary">
+<section class="detail-metrics">
+    <div class="metric-card">
+        <span class="metric-label">Indian Score</span>
+        <strong>{{ best_tasting and ('%.1f'|format(best_tasting.indian_score or 0)) or 'N/A' }}</strong>
+    </div>
+    <div class="metric-card">
+        <span class="metric-label">Resultado de cata</span>
+        <strong>{{ best_tasting and tasting_result_label(best_tasting.result) or 'Sin cata' }}</strong>
+    </div>
+    <div class="metric-card">
+        <span class="metric-label">Viabilidad comercial</span>
+        <strong>{{ best_tasting and ('%.1f'|format(best_tasting.commercial_score or 0)) or 'N/A' }}</strong>
+    </div>
+    <div class="metric-card">
+        <span class="metric-label">Estado de muestra</span>
+        <strong>{{ status_label(sample.status) }}</strong>
+    </div>
+</section>
+
+<section class="sample-workspace">
+    <aside class="sample-index card">
+        <button class="tab-button active" onclick="showTab(event, 'overview')"><i class="fa-solid fa-table-list"></i> Resumen</button>
+        <button class="tab-button" onclick="showTab(event, 'tastings')"><i class="fa-solid fa-mug-hot"></i> Catas</button>
+        <button class="tab-button" onclick="showTab(event, 'documents')"><i class="fa-solid fa-images"></i> Documentos</button>
+        <button class="tab-button" onclick="showTab(event, 'shipments')"><i class="fa-solid fa-truck-fast"></i> Envios</button>
+        <button class="tab-button" onclick="showTab(event, 'timeline')"><i class="fa-solid fa-clock-rotate-left"></i> Actividad</button>
+    </aside>
+
+    <div class="sample-panels">
+        <section id="overview" class="tab-content active">
+            <div class="section-header">
                 <div>
-                    <span class="summary-label">Disponibles</span>
-                    <strong>{{ sample.available_quantity_g }} / {{ sample.received_quantity_g }} g</strong>
+                    <span class="eyebrow">Laboratorio / importacion</span>
+                    <h3>Datos generales</h3>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <div class="detail-metrics">
-        <div class="metric-card">
-            <span class="metric-label">Indian Score</span>
-            <strong>{{ best_tasting and ('%.1f'|format(best_tasting.indian_score)) or 'N/A' }}</strong>
-        </div>
-        <div class="metric-card">
-            <span class="metric-label">Resultado comercial</span>
-            <strong>{{ best_tasting and ('%.1f'|format(best_tasting.commercial_score)) or 'N/A' }}</strong>
-        </div>
-        <div class="metric-card">
-            <span class="metric-label">Estado actual</span>
-            <strong>{{ status_label(sample.status.value) }}</strong>
-        </div>
-    </div>
-
-    <div class="sample-tabs">
-        <div class="tabs">
-            <button class="tab-button active" onclick="showTab(event, 'info')"><i class="fa-solid fa-info-circle"></i> Información</button>
-            <button class="tab-button" onclick="showTab(event, 'tastings')"><i class="fa-solid fa-mortar-pestle"></i> Catas</button>
-            <button class="tab-button" onclick="showTab(event, 'shipments')"><i class="fa-solid fa-truck-fast"></i> Envíos</button>
-            <button class="tab-button" onclick="showTab(event, 'timeline')"><i class="fa-solid fa-clock"></i> Timeline</button>
-            <button class="tab-button" onclick="showTab(event, 'documents')"><i class="fa-solid fa-file-lines"></i> Documentos</button>
-        </div>
-
-        <div id="info" class="tab-content active">
             <div class="info-grid">
-                <div class="info-card"><h4>Origen</h4><p>{{ sample.origin }}, {{ sample.country_name }}</p></div>
-                <div class="info-card"><h4>Productor</h4><p>{{ sample.producer }}</p></div>
-                <div class="info-card"><h4>Proveedor - Ref</h4><p>{{ sample.supplier_reference or '-' }}</p></div>
+                <div class="info-card"><h4>Origen</h4><p>{{ sample.origin or '-' }}</p></div>
+                <div class="info-card"><h4>Pais</h4><p>{{ sample.country_name or '-' }}</p></div>
+                <div class="info-card"><h4>Productor</h4><p>{{ sample.producer or '-' }}</p></div>
+                <div class="info-card"><h4>Referencia proveedor</h4><p>{{ sample.supplier_reference or '-' }}</p></div>
                 <div class="info-card"><h4>Nº muestra proveedor</h4><p>{{ sample.provider_sample_number or '-' }}</p></div>
-                <div class="info-card"><h4>Variedad</h4><p>{{ sample.variety }}</p></div>
-                <div class="info-card"><h4>Cosecha</h4><p>{{ sample.harvest_date }}</p></div>
+                <div class="info-card"><h4>Nº de Contenedor</h4><p>{{ sample.container_number or '-' }}</p></div>
                 <div class="info-card"><h4>Contrato CVC</h4><p>{{ sample.purchase_contract_cvc or '-' }}</p></div>
                 <div class="info-card"><h4>Contrato CVV</h4><p>{{ sample.sales_contract_cvv or '-' }}</p></div>
-                <div class="info-card"><h4>Procesamiento</h4><p>{{ sample.processing }}</p></div>
-                <div class="info-card"><h4>Altitud</h4><p>{{ sample.altitude }} m.s.n.m.</p></div>
+                <div class="info-card"><h4>Almacen</h4><p>{{ sample.warehouse or '-' }}</p></div>
+                <div class="info-card"><h4>Ubicacion fisica</h4><p>{{ sample.physical_location or '-' }}</p></div>
+            </div>
+
+            <div class="section-header compact">
+                <div>
+                    <span class="eyebrow">Analisis fisico</span>
+                    <h3>Datos fisicos</h3>
+                </div>
+            </div>
+            <div class="info-grid">
+                <div class="info-card"><h4>Variedad</h4><p>{{ sample.variety or '-' }}</p></div>
+                <div class="info-card"><h4>Cosecha</h4><p>{{ sample.harvest_date or '-' }}</p></div>
+                <div class="info-card"><h4>Altitud</h4><p>{% if sample.altitude %}{{ sample.altitude }} m.s.n.m.{% else %}-{% endif %}</p></div>
+                <div class="info-card"><h4>Procesamiento</h4><p>{{ sample.processing or '-' }}</p></div>
                 <div class="info-card"><h4>Calidad</h4><p>{{ sample.quality or '-' }}</p></div>
-                <div class="info-card"><h4>Almacén</h4><p>{{ sample.warehouse or '-' }}</p></div>
-                <div class="info-card"><h4>Tipo</h4><p>{{ sample.sample_type or '-' }}</p></div>
-                <div class="info-card"><h4>Categoría</h4><p>{{ sample.category or '-' }}</p></div>
+                <div class="info-card"><h4>Tipo / categoria</h4><p>{{ sample.sample_type or '-' }} / {{ sample.category or '-' }}</p></div>
                 <div class="info-card"><h4>Resultado comercial</h4><p>{{ sample.commercial_result or '-' }}</p></div>
+                <div class="info-card"><h4>Stock</h4><p>{{ sample.available_quantity_g or 0 }} g disponibles</p></div>
             </div>
 
             {% if sample.notes %}
-            <div class="notes-section card">
-                <h4>Notas</h4>
+            <div class="notes-section">
+                <h4>Notas internas</h4>
                 <p>{{ sample.notes }}</p>
             </div>
             {% endif %}
+        </section>
 
-            {% if best_tasting %}
-            <div class="best-tasting card">
-                <h4>Mejor evaluación</h4>
-                <div class="score-display">
-                    <div class="score-card"><span class="score-label">Indian Score</span><span class="score-value">{{ "%.1f"|format(best_tasting.indian_score) }}</span></div>
-                    <div class="score-card"><span class="score-label">Puntuación de taza</span><span class="score-value">{{ "%.1f"|format(best_tasting.cup_score) }}</span></div>
-                    <div class="score-card"><span class="score-label">Viabilidad comercial</span><span class="score-value">{{ "%.1f"|format(best_tasting.commercial_score) }}</span></div>
+        <section id="tastings" class="tab-content">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Cata y calidad</span>
+                    <h3>Catas registradas</h3>
                 </div>
+                <button onclick="showTastingForm()" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Crear cata</button>
             </div>
-            {% endif %}
-        </div>
 
-        <div id="tastings" class="tab-content">
-            <h3>Evaluaciones de cata</h3>
             {% if tastings %}
-                    {% for t in tastings %}
-                    <div class="tasting-card card">
-                        <div class="tasting-header">
-                            <h4>{{ t.evaluator }} • {{ t.tasting_date.strftime('%d/%m/%Y') }}</h4>
-                            <div class="tasting-scores">
-                                <span class="score indian-score"><i class="fa-solid fa-star"></i> {{ "%.1f"|format(t.indian_score) }}</span>
-                                <span class="score cup-score"><i class="fa-solid fa-mug-hot"></i> {{ "%.1f"|format(t.cup_score) }}</span>
-                            </div>
-                        </div>
-                        <div class="tasting-data">
-                            <div class="data-row"><span>Criba 18+:</span><strong>{{ "%.1f"|format(t.sieve_18) }}%</strong><span>Criba 16+:</span><strong>{{ "%.1f"|format(t.sieve_16) }}%</strong><span>Criba 14+:</span><strong>{{ "%.1f"|format(t.sieve_14) }}%</strong></div>
-                            <div class="data-row"><span>Humedad:</span><strong>{{ "%.1f"|format(t.humidity) }}%</strong><span>Defectos primarios:</span><strong>{{ t.defects_primary }}</strong><span>Defectos secundarios:</span><strong>{{ t.defects_secondary }}</strong></div>
-                        </div>
-                        {% if t.tasting_notes %}
-                        <div class="tasting-notes"><strong>Notas de cata:</strong><p>{{ t.tasting_notes }}</p></div>
-                        {% endif %}
-                        {% if t.recommendations %}
-                        <div class="tasting-recommendations"><strong>Recomendaciones:</strong><p>{{ t.recommendations }}</p></div>
-                        {% endif %}
-                        <div class="tasting-actions">
-                            <a class="btn btn-secondary" href="/samples/{{ sample.id }}/tastings/{{ t.id }}/pdf" target="_blank"><i class="fa-solid fa-file-pdf"></i> Ficha PDF</a>
-                            <a class="btn btn-secondary" href="/samples/{{ sample.id }}#tasting-{{ t.id }}">Ver</a>
-                        </div>
-                        <div class="tasting-docs">
-                            <h5>Galería de cata</h5>
-                            <div class="documents-grid">
-                                {% set tasting_docs = [] %}
-                                {% for doc in documents %}
-                                    {% if doc.tasting_id == t.id %}
-                                        {% set _ = tasting_docs.append(doc) %}
-                                    {% endif %}
-                                {% endfor %}
-                                {% if tasting_docs %}
-                                    {% for doc in tasting_docs %}
-                                    <div class="document-card gallery-card">
-                                        <div class="gallery-thumb">
-                                            {% if doc.file_type and doc.file_type.startswith('image') %}
-                                                <img src="/uploads/samples/{{ sample.id }}/tastings/{{ doc.file_path.split('/')[-1] }}" alt="{{ doc.file_name }}" />
-                                            {% else %}
-                                                <i class="fa-solid fa-file-lines"></i>
-                                            {% endif %}
-                                        </div>
-                                        <div>
-                                            <p class="doc-name"><a href="/uploads/samples/{{ sample.id }}/tastings/{{ doc.file_path.split('/')[-1] }}" target="_blank">{{ doc.file_name }}</a></p>
-                                        </div>
-                                    </div>
-                                    {% endfor %}
-                                {% else %}
-                                    <p class="empty">No hay fotos para esta cata</p>
-                                {% endif %}
-                            </div>
-                            <form method="post" action="/samples/{{ sample.id }}/tastings/{{ t.id }}/documents" enctype="multipart/form-data" class="upload-form">
-                                <div class="form-row"><div class="form-group"><label>Subir foto/certificado</label><input type="file" name="file" required></div><div class="form-group"><label>Tipo</label><input type="text" name="document_type" placeholder="cafe_verde, cafe_tostado, molido, ficha"></div></div>
-                                <div class="form-actions"><button class="btn btn-primary" type="submit">Subir a la cata</button></div>
-                            </form>
-                        </div>
-                    </div>
-                    {% endfor %}
-            {% else %}
-                <p class="empty">No hay evaluaciones registradas</p>
-            {% endif %}
-            <button onclick="showTastingForm()" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Agregar cata</button>
-            <div id="tasting-form" style="display: none;">{% include "tasting_form.html" %}</div>
-        </div>
-
-        <div id="shipments" class="tab-content">
-            <h3>Registro de envíos</h3>
-            {% if shipments %}
-                <div class="table-responsive">
-                <table class="table">
-                    <thead><tr><th>Referencia</th><th>Cantidad (kg)</th><th>Destino</th><th>Fecha</th><th>Estado</th></tr></thead>
-                    <tbody>{% for shipment in shipments %}<tr><td>{{ shipment.reference }}</td><td>{{ shipment.quantity }}</td><td>{{ shipment.destination }}</td><td>{{ shipment.shipment_date.strftime('%d/%m/%Y') }}</td><td><span class="status-badge">{{ shipment.status }}</span></td></tr>{% endfor %}</tbody>
-                </table>
-                </div>
-            {% else %}
-                <p class="empty">No hay envíos registrados</p>
-            {% endif %}
-            {% if sample.available_quantity > 0 %}
-            <button onclick="showShipmentForm()" class="btn btn-primary"><i class="fa-solid fa-truck"></i> Registrar envío</button>
-            <div id="shipment-form" style="display: none;">{% include "shipment_form.html" %}</div>
-            {% endif %}
-        </div>
-
-        <div id="timeline" class="tab-content">
-            <h3>Timeline de eventos</h3>
-            {% if events %}
-                <div class="timeline">
-                    {% for event in events %}
-                    <div class="timeline-event">
-                        <div class="event-icon">
-                            {% if event.event_type == 'received' %}<i class="fa-solid fa-box-open"></i>
-                            {% elif event.event_type == 'tasted' %}<i class="fa-solid fa-mortar-pestle"></i>
-                            {% elif event.event_type == 'shipped' %}<i class="fa-solid fa-truck-fast"></i>
-                            {% else %}<i class="fa-solid fa-clock"></i>{% endif %}
-                        </div>
+            <div class="tasting-list">
+                {% for t in tastings %}
+                <article id="tasting-{{ t.id }}" class="tasting-card">
+                    <div class="tasting-header">
                         <div>
-                            <div class="event-date">{{ event.event_date.strftime('%d/%m/%Y %H:%M') }}</div>
-                            <div class="event-type">{{ event.event_type.upper() }}</div>
-                            <div class="event-description">{{ event.description }}</div>
+                            <span class="eyebrow">{{ t.tasting_date.strftime('%d/%m/%Y') if t.tasting_date else '-' }}</span>
+                            <h4>{{ t.evaluator or 'Evaluador no indicado' }}</h4>
+                            <p>Resultado de cata: <strong>{{ tasting_result_label(t.result) }}</strong></p>
+                        </div>
+                        <div class="tasting-actions">
+                            <a class="btn btn-secondary" href="/samples/{{ sample.id }}#tasting-{{ t.id }}"><i class="fa-solid fa-eye"></i> Ver cata</a>
+                            <a class="btn btn-primary" href="/samples/{{ sample.id }}/tastings/{{ t.id }}/pdf" target="_blank"><i class="fa-solid fa-file-pdf"></i> Ficha de cata PDF</a>
                         </div>
                     </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <p class="empty">Sin eventos registrados</p>
-            {% endif %}
-        </div>
 
-        <div id="documents" class="tab-content">
-            <h3>Galería de documentos</h3>
-            <div class="card">
-                <form method="post" action="/samples/{{ sample.id }}/documents" enctype="multipart/form-data">
-                    <div class="form-row"><div class="form-group"><label>Archivo</label><input type="file" name="file" required></div><div class="form-group"><label>Tipo</label><input type="text" name="document_type" placeholder="Ej: ficha_cata"></div></div>
-                    <div class="form-actions"><button class="btn btn-primary" type="submit">Subir documento</button></div>
-                </form>
+                    <div class="score-display">
+                        <div class="score-card"><span class="score-label">Indian Score</span><span class="score-value">{{ "%.1f"|format(t.indian_score or 0) }}</span></div>
+                        <div class="score-card"><span class="score-label">Taza</span><span class="score-value">{{ "%.1f"|format(t.cup_score or 0) }}</span></div>
+                        <div class="score-card"><span class="score-label">Comercial</span><span class="score-value">{{ "%.1f"|format(t.commercial_score or 0) }}</span></div>
+                        <div class="score-card"><span class="score-label">Valoracion</span><span class="score-value">{{ t.valuation if t.valuation is not none else '-' }}</span></div>
+                    </div>
+
+                    <div class="data-matrix">
+                        <div><span>Humedad</span><strong>{{ "%.1f"|format(t.humidity or 0) }}%</strong></div>
+                        <div><span>Criba 18+</span><strong>{{ "%.1f"|format(t.sieve_18 or 0) }}%</strong></div>
+                        <div><span>Criba 17</span><strong>{{ "%.1f"|format(t.sieve_17 or 0) }}%</strong></div>
+                        <div><span>Criba 16+</span><strong>{{ "%.1f"|format(t.sieve_16 or 0) }}%</strong></div>
+                        <div><span>Criba 15</span><strong>{{ "%.1f"|format(t.sieve_15 or 0) }}%</strong></div>
+                        <div><span>Criba 14+</span><strong>{{ "%.1f"|format(t.sieve_14 or 0) }}%</strong></div>
+                        <div><span>Defectos primarios</span><strong>{{ t.defects_primary or 0 }}</strong></div>
+                        <div><span>Defectos secundarios</span><strong>{{ t.defects_secondary or 0 }}</strong></div>
+                    </div>
+
+                    <div class="sensory-grid">
+                        <div><span>Aroma</span><strong>{{ t.aroma or 0 }}</strong></div>
+                        <div><span>Acidez</span><strong>{{ t.acidity or 0 }}</strong></div>
+                        <div><span>Cuerpo</span><strong>{{ t.body or 0 }}</strong></div>
+                        <div><span>Sabor</span><strong>{{ t.flavor or 0 }}</strong></div>
+                        <div><span>Postgusto</span><strong>{{ t.aftertaste or 0 }}</strong></div>
+                        <div><span>Limpieza</span><strong>{{ t.cleanliness or 0 }}</strong></div>
+                        <div><span>Balance</span><strong>{{ t.balance or 0 }}</strong></div>
+                    </div>
+
+                    {% if t.tasting_notes %}
+                    <div class="notes-section">
+                        <h4>Notas de cata</h4>
+                        <p>{{ t.tasting_notes }}</p>
+                    </div>
+                    {% endif %}
+                    {% if t.recommendations %}
+                    <div class="notes-section muted">
+                        <h4>Recomendaciones</h4>
+                        <p>{{ t.recommendations }}</p>
+                    </div>
+                    {% endif %}
+
+                    <div class="tasting-docs">
+                        <h5>Fotografias de la cata</h5>
+                        <div class="documents-grid">
+                            {% set tasting_docs = [] %}
+                            {% for doc in documents %}
+                                {% if doc.tasting_id == t.id %}
+                                    {% set _ = tasting_docs.append(doc) %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if tasting_docs %}
+                                {% for doc in tasting_docs %}
+                                <div class="document-card gallery-card">
+                                    <div class="gallery-thumb">
+                                        {% if doc.file_type and doc.file_type.startswith('image') %}
+                                            <img src="/uploads/samples/{{ sample.id }}/tastings/{{ t.id }}/{{ doc.file_path.split('/')[-1] }}" alt="{{ doc.file_name }}" />
+                                        {% else %}
+                                            <i class="fa-solid fa-file-lines"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <p class="doc-name"><a href="/uploads/samples/{{ sample.id }}/tastings/{{ t.id }}/{{ doc.file_path.split('/')[-1] }}" target="_blank">{{ doc.file_name }}</a></p>
+                                        <small>{{ doc.file_type }}</small>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="empty">No hay fotos para esta cata.</p>
+                            {% endif %}
+                        </div>
+                        <form method="post" action="/samples/{{ sample.id }}/tastings/{{ t.id }}/documents" enctype="multipart/form-data" class="upload-form">
+                            <div class="form-row">
+                                <div class="form-group"><label>Subir foto/certificado</label><input type="file" name="file" required></div>
+                                <div class="form-group"><label>Tipo</label><input type="text" name="document_type" placeholder="cafe_verde, cafe_tostado, molido, ficha"></div>
+                            </div>
+                            <div class="form-actions"><button class="btn btn-secondary" type="submit"><i class="fa-solid fa-upload"></i> Subir a la cata</button></div>
+                        </form>
+                    </div>
+                </article>
+                {% endfor %}
             </div>
+            {% else %}
+            <p class="empty">No hay evaluaciones registradas.</p>
+            {% endif %}
+
+            <div id="tasting-form" class="embedded-form" style="display: none;">{% include "tasting_form.html" %}</div>
+        </section>
+
+        <section id="documents" class="tab-content">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Documentos y fotografias</span>
+                    <h3>Archivos de muestra</h3>
+                </div>
+            </div>
+            <form method="post" action="/samples/{{ sample.id }}/documents" enctype="multipart/form-data" class="upload-form">
+                <div class="form-row">
+                    <div class="form-group"><label>Archivo</label><input type="file" name="file" required></div>
+                    <div class="form-group"><label>Tipo</label><input type="text" name="document_type" placeholder="Ej: cafe_verde, certificado"></div>
+                </div>
+                <div class="form-actions"><button class="btn btn-primary" type="submit"><i class="fa-solid fa-upload"></i> Subir documento</button></div>
+            </form>
             {% if documents %}
-                <div class="documents-grid">
-                    {% for doc in documents %}
+            <div class="documents-grid">
+                {% for doc in documents %}
+                    {% if not doc.tasting_id %}
                     <div class="document-card gallery-card">
                         <div class="gallery-thumb">
                             {% if doc.file_type and doc.file_type.startswith('image') or doc.file_name.lower().endswith('.png') or doc.file_name.lower().endswith('.jpg') or doc.file_name.lower().endswith('.jpeg') %}
@@ -232,38 +240,88 @@
                         <div>
                             <p class="doc-name"><a href="/uploads/{{ sample.id }}/{{ doc.file_path.split('/')[-1] }}" target="_blank">{{ doc.file_name }}</a></p>
                             <small>{{ doc.file_type }}</small>
-                            <small>{{ doc.upload_date.strftime('%d/%m/%Y') }}</small>
+                            <small>{{ doc.upload_date.strftime('%d/%m/%Y') if doc.upload_date else '' }}</small>
                         </div>
                     </div>
-                    {% endfor %}
-                </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
             {% else %}
-                <p class="empty">No hay documentos</p>
+            <p class="empty">No hay documentos.</p>
             {% endif %}
-        </div>
-    </div>
-</div>
+        </section>
 
-<div id="modal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <span class="close" onclick="closeModal()">&times;</span>
-        <div id="modal-body"></div>
+        <section id="shipments" class="tab-content">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Logistica</span>
+                    <h3>Envios</h3>
+                </div>
+                {% if (sample.available_quantity_g or 0) > 0 %}
+                <button onclick="showShipmentForm()" class="btn btn-primary"><i class="fa-solid fa-truck"></i> Registrar envio</button>
+                {% endif %}
+            </div>
+            {% if shipments %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead><tr><th>Referencia</th><th>Cantidad</th><th>Destino</th><th>Fecha</th><th>Estado</th></tr></thead>
+                    <tbody>
+                    {% for shipment in shipments %}
+                    <tr><td>{{ shipment.reference }}</td><td>{{ shipment.quantity_g or (shipment.quantity * 1000)|round(0) }} g</td><td>{{ shipment.destination }}</td><td>{{ shipment.shipment_date.strftime('%d/%m/%Y') if shipment.shipment_date else '-' }}</td><td>{{ shipment.status }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="empty">No hay envios registrados.</p>
+            {% endif %}
+            <div id="shipment-form" class="embedded-form" style="display: none;">{% include "shipment_form.html" %}</div>
+        </section>
+
+        <section id="timeline" class="tab-content">
+            <div class="section-header">
+                <div>
+                    <span class="eyebrow">Historial</span>
+                    <h3>Actividad</h3>
+                </div>
+            </div>
+            {% if events %}
+            <div class="timeline">
+                {% for event in events %}
+                <div class="timeline-event">
+                    <div class="event-icon">
+                        {% if event.event_type == 'received' %}<i class="fa-solid fa-box-open"></i>
+                        {% elif event.event_type == 'tasted' %}<i class="fa-solid fa-mug-hot"></i>
+                        {% elif event.event_type == 'shipped' %}<i class="fa-solid fa-truck-fast"></i>
+                        {% else %}<i class="fa-solid fa-clock"></i>{% endif %}
+                    </div>
+                    <div>
+                        <div class="event-date">{{ event.event_date.strftime('%d/%m/%Y %H:%M') if event.event_date else '-' }}</div>
+                        <div class="event-type">{{ event.event_type }}</div>
+                        <div class="event-description">{{ event.description }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="empty">Sin eventos registrados.</p>
+            {% endif %}
+        </section>
     </div>
-</div>
+</section>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 function showTab(evt, tabName) {
-    const contents = document.querySelectorAll('.tab-content');
-    const buttons = document.querySelectorAll('.tab-button');
-    contents.forEach(c => c.classList.remove('active'));
-    buttons.forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
     document.getElementById(tabName).classList.add('active');
     evt.currentTarget.classList.add('active');
 }
 
 function showTastingForm() {
+    showTab({ currentTarget: document.querySelector('.tab-button[onclick*="tastings"]') }, 'tastings');
     document.getElementById('tasting-form').style.display = 'block';
 }
 

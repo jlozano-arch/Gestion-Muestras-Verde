@@ -1,281 +1,145 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Gestión de Muestras{% endblock %}
+{% block title %}Dashboard - Gestion de Muestras{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<section class="dashboard-opsbar">
     <div>
-        <span class="eyebrow"><i class="fa-solid fa-briefcase"></i> Trading & Laboratorio</span>
-        <h2>Control avanzado de muestras</h2>
-        <p class="lead">Monitorea el estado de tus lotes, la calidad del café y el progreso comercial desde un panel ágil y profesional.</p>
+        <h2>Dashboard</h2>
+        <span>{{ total_samples }} muestras · {{ total_quantity }} g disponibles · {{ out_of_stock }} sin stock</span>
     </div>
     <div class="page-actions">
         <a href="/samples/new" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Nueva muestra</a>
-        <a href="/samples" class="btn btn-secondary"><i class="fa-solid fa-cubes-stacked"></i> Todas las muestras</a>
+        <a href="/samples" class="btn btn-secondary"><i class="fa-solid fa-cubes-stacked"></i> Muestras</a>
         <a href="/compare" class="btn btn-secondary"><i class="fa-solid fa-scale-balanced"></i> Comparador</a>
     </div>
-</div>
+</section>
 
-<div class="stats-grid">
-    <article class="stat-card card">
-        <div class="stat-icon"><i class="fa-solid fa-cube"></i></div>
-        <div>
-            <p class="stat-label">Total muestras</p>
-            <div class="stat-number">{{ total_samples }}</div>
-        </div>
-    </article>
-    <article class="stat-card card">
-        <div class="stat-icon"><i class="fa-solid fa-seedling"></i></div>
-        <div>
-            <p class="stat-label">Disponibles</p>
-            <div class="stat-number">{{ available_samples }}</div>
-        </div>
-    </article>
-    <article class="stat-card card">
-        <div class="stat-icon"><i class="fa-solid fa-flask"></i></div>
-        <div>
-            <p class="stat-label">En cata</p>
-            <div class="stat-number">{{ recent_samples|selectattr('status','equalto','analyzing')|list|length }}</div>
-        </div>
-    </article>
-    <article class="stat-card card">
-        <div class="stat-icon"><i class="fa-solid fa-truck-fast"></i></div>
-        <div>
-            <p class="stat-label">Compradas</p>
-            <div class="stat-number">{{ recent_samples|selectattr('status','equalto','purchased')|list|length }}</div>
-        </div>
-    </article>
-    <article class="stat-card card">
-        <div class="stat-icon"><i class="fa-solid fa-balance-scale-left"></i></div>
-        <div>
-            <p class="stat-label">Cantidad disponible total (g)</p>
-            <div class="stat-number">{{ total_quantity }}</div>
-        </div>
-    </article>
-    <article class="stat-card card">
-        <div class="stat-icon"><i class="fa-solid fa-ban"></i></div>
-        <div>
-            <p class="stat-label">Rechazadas</p>
-            <div class="stat-number">{{ recent_samples|selectattr('status','equalto','rejected')|list|length }}</div>
-        </div>
-    </article>
-    <article class="stat-card card">
-        <div class="stat-icon"><i class="fa-solid fa-star"></i></div>
-        <div>
-            <p class="stat-label">Indian Score medio</p>
-            <div class="stat-number">{% if high_score_samples %}0{% else %}0{% endif %}</div>
-        </div>
-    </article>
-</div>
+<section class="dashboard-kpis">
+    <div class="stats-grid compact">
+        <article class="stat-card"><span class="stat-label">Total muestras</span><strong class="stat-number">{{ total_samples }}</strong></article>
+        <article class="stat-card"><span class="stat-label">Recibidas</span><strong class="stat-number">{{ received_samples }}</strong></article>
+        <article class="stat-card"><span class="stat-label">Disponibles</span><strong class="stat-number">{{ available_samples }}</strong></article>
+        <article class="stat-card"><span class="stat-label">Aprobadas</span><strong class="stat-number">{{ approved_samples }}</strong></article>
+        <article class="stat-card"><span class="stat-label">Rechazadas</span><strong class="stat-number">{{ rejected_samples }}</strong></article>
+        <article class="stat-card"><span class="stat-label">Enviadas</span><strong class="stat-number">{{ shipped_samples }}</strong></article>
+        <article class="stat-card"><span class="stat-label">Archivadas</span><strong class="stat-number">{{ archived_samples }}</strong></article>
+    </div>
+</section>
 
-<div class="page-grid">
-    <section class="card chart-panel">
-        <div class="card-header">
-            <div>
-                <h3>Muestras por origen</h3>
-                <p>Distribución geográfica de los lotes recientes.</p>
-            </div>
+<section class="dashboard-board dashboard-primary">
+    <article class="card board-card">
+        <div class="card-header"><h3>Ultimas muestras registradas</h3></div>
+        <div class="table-responsive ops-table-wrap">
+            <table class="ops-table">
+                <thead>
+                    <tr><th>Codigo</th><th>Origen</th><th>Stock</th><th>Estado</th></tr>
+                </thead>
+                <tbody>
+                    {% for sample in recent_samples %}
+                    <tr>
+                        <td><a href="/samples/{{ sample.id }}">{{ sample.code }}</a></td>
+                        <td>{{ sample.origin or sample.country_name or '-' }}</td>
+                        <td>{{ sample.available_quantity_g or 0 }} g</td>
+                        <td><span class="status-badge status-{{ status_class(sample.status) }}">{{ status_label(sample.status) }}</span></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="empty">Sin muestras registradas.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        <div class="chart-wrapper">
-            <canvas id="originChart"></canvas>
-        </div>
-    </section>
+    </article>
 
-    <section class="card chart-panel">
-        <div class="card-header">
-            <div>
-                <h3>Muestras por proveedor</h3>
-                <p>Ranking de productores con lotes en el panel.</p>
-            </div>
+    <article class="card board-card">
+        <div class="card-header"><h3>Muestras pendientes de catar</h3></div>
+        <div class="table-responsive ops-table-wrap">
+            <table class="ops-table">
+                <thead>
+                    <tr><th>Codigo</th><th>Origen</th><th>Stock</th></tr>
+                </thead>
+                <tbody>
+                    {% for sample in pending_tasting_samples %}
+                    <tr>
+                        <td><a href="/samples/{{ sample.id }}">{{ sample.code }}</a></td>
+                        <td>{{ sample.origin or sample.country_name or '-' }}</td>
+                        <td>{{ sample.available_quantity_g or 0 }} g</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="empty">Sin pendientes.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        <div class="chart-wrapper">
-            <canvas id="providerChart"></canvas>
-        </div>
-    </section>
-</div>
+    </article>
 
-<div class="page-grid">
-    <section class="card chart-panel">
-        <div class="card-header">
-            <div>
-                <h3>Estado comercial</h3>
-                <p>Visión rápida de ventas y stock.</p>
-            </div>
+    <article class="card board-card">
+        <div class="card-header"><h3>Muestras sin stock</h3></div>
+        <div class="table-responsive ops-table-wrap">
+            <table class="ops-table">
+                <thead>
+                    <tr><th>Codigo</th><th>Origen</th><th>Estado</th></tr>
+                </thead>
+                <tbody>
+                    {% for sample in out_of_stock_samples %}
+                    <tr>
+                        <td><a href="/samples/{{ sample.id }}">{{ sample.code }}</a></td>
+                        <td>{{ sample.origin or sample.country_name or '-' }}</td>
+                        <td>{{ status_label(sample.status) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="empty">Sin incidencias.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        <div class="chart-wrapper">
-            <canvas id="statusChart"></canvas>
-        </div>
-    </section>
+    </article>
 
-    <section class="card chart-panel">
-        <div class="card-header">
-            <div>
-                <h3>Evolución mensual</h3>
-                <p>Actividad reciente de muestras por mes.</p>
-            </div>
+    <article class="card board-card">
+        <div class="card-header"><h3>Ultimas catas realizadas</h3></div>
+        <div class="table-responsive ops-table-wrap">
+            <table class="ops-table">
+                <thead>
+                    <tr><th>Muestra</th><th>Evaluador</th><th>Score</th><th>Resultado</th></tr>
+                </thead>
+                <tbody>
+                    {% for tasting in latest_tastings %}
+                    <tr>
+                        <td>{% if tasting.sample %}<a href="/samples/{{ tasting.sample.id }}">{{ tasting.sample.code }}</a>{% else %}-{% endif %}</td>
+                        <td>{{ tasting.evaluator or '-' }}</td>
+                        <td><strong>{{ "%.1f"|format(tasting.indian_score or 0) }}</strong></td>
+                        <td>{{ tasting_result_label(tasting.result) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="empty">Sin catas.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        <div class="chart-wrapper">
-            <canvas id="trendChart"></canvas>
-        </div>
-    </section>
-</div>
+    </article>
+</section>
 
-<div class="page-grid">
-    <section class="card">
-        <div class="card-header">
-            <h3>Muestras recientes</h3>
-        </div>
-        <div class="recent-list">
-            {% if recent_samples %}
-                {% for sample in recent_samples %}
-                <div class="recent-card">
-                    <div>
-                        <strong>{{ sample.code }}</strong>
-                        <p>{{ sample.country_name }} • {{ sample.origin }}</p>
-                    </div>
-                    <div class="recent-meta">
-                        <span>{{ sample.available_quantity_g }} g</span>
-                        <a href="/samples/{{ sample.id }}" class="btn btn-small btn-secondary">Ver</a>
-                    </div>
-                </div>
-                {% endfor %}
+<section class="dashboard-board dashboard-secondary">
+    <article class="card board-card">
+        <div class="card-header"><h3>Muestras por origen</h3></div>
+        <div class="compact-list">
+            {% for origin, count in origin_counts %}
+            <div class="list-row"><span>{{ origin or 'Sin origen' }}</span><strong>{{ count }}</strong></div>
             {% else %}
-                <p class="empty">No hay muestras registradas</p>
-            {% endif %}
+            <p class="empty">Sin datos.</p>
+            {% endfor %}
         </div>
-    </section>
+    </article>
 
-    <section class="card">
-        <div class="card-header">
-            <h3>Mejor puntuación</h3>
-        </div>
-        <div class="recent-list">
-            {% if high_score_samples %}
-                {% for sample in high_score_samples %}
-                <div class="recent-card">
-                    <div>
-                        <strong>{{ sample.code }}</strong>
-                        <p>{{ sample.country_name }} • {{ sample.origin }}</p>
-                    </div>
-                    <div class="recent-meta">
-                        <span><i class="fa-solid fa-star"></i> {{ sample.tastings|length and sample.tastings[0].indian_score or 'N/A' }}</span>
-                        <a href="/samples/{{ sample.id }}" class="btn btn-small btn-secondary">Explorar</a>
-                    </div>
-                </div>
-                {% endfor %}
+    <article class="card board-card">
+        <div class="card-header"><h3>Muestras por proveedor</h3></div>
+        <div class="compact-list">
+            {% for provider, count in provider_counts %}
+            <div class="list-row"><span>{{ provider or 'Sin proveedor' }}</span><strong>{{ count }}</strong></div>
             {% else %}
-                <p class="empty">Sin evaluaciones aún</p>
-            {% endif %}
+            <p class="empty">Sin datos.</p>
+            {% endfor %}
         </div>
-    </section>
-</div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-function aggregate(items) {
-    return items.reduce((acc, item) => {
-        acc[item] = (acc[item] || 0) + 1;
-        return acc;
-    }, {});
-}
-
-const recentOrigins = [{% for sample in recent_samples %}'{{ sample.origin|escape }}'{% if not loop.last %}, {% endif %}{% endfor %}];
-const recentProviders = [{% for sample in recent_samples %}'{{ sample.producer|escape }}'{% if not loop.last %}, {% endif %}{% endfor %}];
-const recentStatuses = [{% for sample in recent_samples %}'{{ sample.status|escape }}'{% if not loop.last %}, {% endif %}{% endfor %}];
-const recentMonths = [{% for sample in recent_samples %}'{{ sample.created_at.strftime('%b %Y') }}'{% if not loop.last %}, {% endif %}{% endfor %}];
-
-const originData = aggregate(recentOrigins);
-const providerData = aggregate(recentProviders);
-const statusData = aggregate(recentStatuses);
-const monthData = aggregate(recentMonths);
-
-const originCtx = document.getElementById('originChart');
-if (originCtx) {
-    new Chart(originCtx, {
-        type: 'doughnut',
-        data: {
-            labels: Object.keys(originData),
-            datasets: [{
-                data: Object.values(originData),
-                backgroundColor: ['#174b2c', '#4a7f50', '#7b8f56', '#b4c18c', '#d4dcbd'],
-                borderColor: '#fff',
-                borderWidth: 2
-            }]
-        },
-        options: {
-            plugins: { legend: { position: 'bottom', labels: { color: '#4f6b5e' } } },
-            responsive: true,
-            maintainAspectRatio: false,
-        }
-    });
-}
-
-const providerCtx = document.getElementById('providerChart');
-if (providerCtx) {
-    new Chart(providerCtx, {
-        type: 'bar',
-        data: {
-            labels: Object.keys(providerData),
-            datasets: [{
-                data: Object.values(providerData),
-                backgroundColor: '#3a7e4c',
-                borderRadius: 12,
-            }]
-        },
-        options: {
-            plugins: { legend: { display: false } },
-            scales: { x: { ticks: { color: '#4f6b5e' } }, y: { beginAtZero: true, ticks: { color: '#4f6b5e' } } },
-            responsive: true,
-            maintainAspectRatio: false,
-        }
-    });
-}
-
-const statusCtx = document.getElementById('statusChart');
-if (statusCtx) {
-    new Chart(statusCtx, {
-        type: 'pie',
-        data: {
-            labels: Object.keys(statusData),
-            datasets: [{
-                data: Object.values(statusData),
-                backgroundColor: ['#3a7e4c', '#d1d89f', '#7b8f56', '#f2b179', '#e6d0b8'],
-                borderColor: '#fff',
-                borderWidth: 2,
-            }]
-        },
-        options: {
-            plugins: { legend: { position: 'bottom', labels: { color: '#4f6b5e' } } },
-            responsive: true,
-            maintainAspectRatio: false,
-        }
-    });
-}
-
-const trendCtx = document.getElementById('trendChart');
-if (trendCtx) {
-    new Chart(trendCtx, {
-        type: 'line',
-        data: {
-            labels: Object.keys(monthData),
-            datasets: [{
-                label: 'Muestras',
-                data: Object.values(monthData),
-                borderColor: '#174b2c',
-                backgroundColor: 'rgba(23, 75, 44, 0.16)',
-                fill: true,
-                tension: 0.35,
-                pointRadius: 4,
-            }]
-        },
-        options: {
-            plugins: { legend: { display: false } },
-            scales: { x: { ticks: { color: '#4f6b5e' } }, y: { beginAtZero: true, ticks: { color: '#4f6b5e' } } },
-            responsive: true,
-            maintainAspectRatio: false,
-        }
-    });
-}
-</script>
+    </article>
+</section>
 {% endblock %}

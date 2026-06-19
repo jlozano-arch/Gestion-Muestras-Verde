@@ -6,43 +6,131 @@
 <div class="page-header">
     <div>
         <span class="eyebrow"><i class="fa-solid fa-tag"></i> Etiquetas</span>
-        <h2>Generar etiquetas</h2>
-        <p class="lead">Selecciona una o varias muestras y pulsa generar para abrir las etiquetas en nuevas pestañas.</p>
+        <h2>Impresion Avery L7108REV</h2>
+        <p class="lead">Selecciona muestras, numero de copias y la primera posicion libre de la hoja A4.</p>
     </div>
 </div>
 
-<div class="card">
-    <form id="labels-form">
-        <div class="table-responsive">
-            <table class="table">
-                <thead><tr><th></th><th>Código</th><th>Origen</th><th>Productor</th><th>Disponibles</th></tr></thead>
-                <tbody>
-                {% for s in all_samples %}
-                <tr>
-                    <td><input type="checkbox" name="ids" value="{{ s.id }}"></td>
-                    <td>{{ s.code }}</td>
-                    <td>{{ s.origin }}</td>
-                    <td>{{ s.producer }}</td>
-                    <td>{{ s.available_quantity_g }} g</td>
-                </tr>
+<div class="label-layout">
+    <section class="card label-config">
+        <div class="card-header">
+            <div>
+                <h3>Configuracion de hoja</h3>
+                <p>Avery L7108REV, A4 apaisado, matriz 3 x 3, etiqueta horizontal 89 x 62 mm.</p>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="label-selection-summary" id="label-selection-summary">
+                <strong>{{ selected_label_samples|length }}</strong>
+                <span>muestras seleccionadas</span>
+                <small id="label-selection-codes">
+                    {% if selected_label_samples %}
+                        {{ selected_label_samples|map(attribute='code')|join(', ') }}
+                    {% else %}
+                        Selecciona muestras en la tabla o vuelve desde el listado.
+                    {% endif %}
+                </small>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Modelo</label>
+                    <select id="label-model">
+                        <option value="L7108REV" selected>Avery L7108REV</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Numero de copias</label>
+                    <input id="label-copies" type="number" min="1" step="1" value="1">
+                </div>
+                <div class="form-group">
+                    <label>Posicion inicial</label>
+                    <select id="label-start-position">
+                        {% for pos in range(1, 10) %}
+                        <option value="{{ pos }}">Etiqueta {{ pos }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="label-sheet-preview" aria-label="Vista de posiciones de la hoja">
+                {% for pos in range(1, 10) %}
+                <div class="label-slot">{{ pos }}</div>
                 {% endfor %}
-                </tbody>
-            </table>
+            </div>
         </div>
-        <div class="form-actions">
-            <button type="button" id="generate-labels" class="btn btn-primary">Generar etiquetas</button>
-        </div>
-    </form>
-</div>
+    </section>
 
+    <section class="card">
+        <form id="labels-form">
+            <div class="card-header">
+                <div>
+                    <h3>Muestras</h3>
+                    <p>El PDF se generara en orden de seleccion por ID y repetira cada muestra segun las copias.</p>
+                </div>
+            </div>
+            <div class="card-body table-responsive">
+                <table class="table">
+                    <thead><tr><th></th><th>Codigo</th><th>Pais</th><th>Origen</th><th>Proveedor</th><th>Ref. proveedor</th></tr></thead>
+                    <tbody>
+                    {% for s in all_samples %}
+                    <tr>
+                        <td><input type="checkbox" name="ids" value="{{ s.id }}" data-code="{{ s.code }}" {% if s.id in selected_label_ids %}checked{% endif %}></td>
+                        <td><a href="/samples/{{ s.id }}">{{ s.code }}</a></td>
+                        <td>{{ s.country_name or '-' }}</td>
+                        <td>{{ s.origin or '-' }}</td>
+                        <td>{{ s.producer or '-' }}</td>
+                        <td>{{ s.supplier_reference or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                <div class="form-actions">
+                    <button type="button" id="generate-labels" class="btn btn-primary"><i class="fa-solid fa-file-pdf"></i> Generar PDF Avery</button>
+                </div>
+            </div>
+        </form>
+    </section>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+const startSelect = document.getElementById('label-start-position');
+const slots = Array.from(document.querySelectorAll('.label-slot'));
+const labelChecks = Array.from(document.querySelectorAll('input[name="ids"]'));
+const summary = document.getElementById('label-selection-summary');
+const summaryCount = summary.querySelector('strong');
+const summaryCodes = document.getElementById('label-selection-codes');
+
+function paintStartPosition() {
+    const start = Number(startSelect.value);
+    slots.forEach((slot, index) => {
+        slot.classList.toggle('is-start', index + 1 === start);
+        slot.classList.toggle('is-used', index + 1 < start);
+    });
+}
+
+startSelect.addEventListener('change', paintStartPosition);
+paintStartPosition();
+
+function updateSelectionSummary() {
+    const selected = labelChecks.filter(c => c.checked);
+    summaryCount.textContent = selected.length;
+    summaryCodes.textContent = selected.length
+        ? selected.map(c => c.dataset.code || c.value).join(', ')
+        : 'Selecciona muestras en la tabla o vuelve desde el listado.';
+}
+
+labelChecks.forEach((check) => check.addEventListener('change', updateSelectionSummary));
+updateSelectionSummary();
+
 document.getElementById('generate-labels').addEventListener('click', () => {
-    const ids = Array.from(document.querySelectorAll('input[name="ids"]:checked')).map(c => c.value);
+    const ids = labelChecks.filter(c => c.checked).map(c => c.value);
     if (!ids.length) return alert('Selecciona al menos una muestra');
-    ids.forEach(id => window.open(`/samples/${id}/label`, '_blank'));
+    const model = document.getElementById('label-model').value;
+    const copies = document.getElementById('label-copies').value || 1;
+    const start = document.getElementById('label-start-position').value || 1;
+    const params = new URLSearchParams({ ids: ids.join(','), model, copies, start_position: start });
+    window.open(`/labels/pdf?${params.toString()}`, '_blank');
 });
 </script>
 {% endblock %}

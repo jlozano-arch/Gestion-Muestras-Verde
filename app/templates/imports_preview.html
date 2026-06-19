@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}Previsualizacion Importacion #{{ batch.id }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <span class="eyebrow"><i class="fa-solid fa-table-list"></i> Staging Excel</span>
+        <h2>Importacion #{{ batch.id }}</h2>
+        <p class="lead">{{ batch.filename }} · {{ batch.status }} · staging y control manual por fila.</p>
+    </div>
+    <div class="page-actions">
+        <a href="/imports" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Volver</a>
+    </div>
+</div>
+
+{% if apply_summary %}
+<section class="card import-apply-result">
+    <div class="card-header">
+        <h3>Resultado de aplicacion</h3>
+        {% if created_sample_ids %}
+        <a class="btn btn-primary" href="/labels?ids={{ created_sample_ids_csv }}">
+            <i class="fa-solid fa-tags"></i> Imprimir etiquetas de muestras creadas
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body import-result-grid">
+        <div><span>Creadas</span><strong>{{ apply_summary.created }}</strong></div>
+        <div><span>Excluidas manualmente</span><strong>{{ apply_summary.manual }}</strong></div>
+        <div><span>Duplicadas omitidas</span><strong>{{ apply_summary.duplicate }}</strong></div>
+        <div><span>Existentes omitidas</span><strong>{{ apply_summary.existing }}</strong></div>
+        <div><span>Incompletas omitidas</span><strong>{{ apply_summary.incomplete }}</strong></div>
+        <div><span>Errores omitidos</span><strong>{{ apply_summary.errors }}</strong></div>
+    </div>
+</section>
+{% endif %}
+
+{% if rollback_summary %}
+<section class="card import-apply-result">
+    <div class="card-header">
+        <h3>Rollback simple</h3>
+    </div>
+    <div class="card-body import-result-grid">
+        <div><span>Muestras eliminadas</span><strong>{{ rollback_summary.deleted }}</strong></div>
+        <div><span>Estado batch</span><strong>{{ batch.status }}</strong></div>
+    </div>
+</section>
+{% endif %}
+
+<section class="dashboard-kpis import-summary">
+    <div class="stats-grid compact">
+        <article class="stat-card"><span class="stat-label">Total filas</span><strong class="stat-number">{{ batch.total_rows }}</strong></article>
+        <article class="stat-card"><span class="stat-label">Nuevas</span><strong class="stat-number">{{ batch.create_count }}</strong></article>
+        <article class="stat-card"><span class="stat-label">Existentes</span><strong class="stat-number">{{ batch.existing_count }}</strong></article>
+        <article class="stat-card"><span class="stat-label">Duplicadas</span><strong class="stat-number">{{ batch.duplicate_count }}</strong></article>
+        <article class="stat-card"><span class="stat-label">Incompletas</span><strong class="stat-number">{{ batch.incomplete_count }}</strong></article>
+        <article class="stat-card"><span class="stat-label">Avisos</span><strong class="stat-number">{{ batch.warning_count }}</strong></article>
+        <article class="stat-card"><span class="stat-label">Errores</span><strong class="stat-number">{{ batch.error_count }}</strong></article>
+    </div>
+</section>
+
+<section class="card import-filterbar">
+    <div class="card-body">
+        <a class="btn btn-small {% if not active_action %}btn-primary{% else %}btn-secondary{% endif %}" href="/imports/{{ batch.id }}">Todas</a>
+        <a class="btn btn-small {% if active_action == 'CREATE_CANDIDATE' %}btn-primary{% else %}btn-secondary{% endif %}" href="/imports/{{ batch.id }}?action=CREATE_CANDIDATE">Nuevas</a>
+        <a class="btn btn-small {% if active_action == 'EXISTING_MATCH' %}btn-primary{% else %}btn-secondary{% endif %}" href="/imports/{{ batch.id }}?action=EXISTING_MATCH">Existentes</a>
+        <a class="btn btn-small {% if active_action == 'DUPLICATE_IN_FILE' %}btn-primary{% else %}btn-secondary{% endif %}" href="/imports/{{ batch.id }}?action=DUPLICATE_IN_FILE">Duplicadas</a>
+        <a class="btn btn-small {% if active_action == 'INCOMPLETE' %}btn-primary{% else %}btn-secondary{% endif %}" href="/imports/{{ batch.id }}?action=INCOMPLETE">Incompletas</a>
+        <a class="btn btn-small {% if active_action == 'WARNING_SIMILAR' %}btn-primary{% else %}btn-secondary{% endif %}" href="/imports/{{ batch.id }}?action=WARNING_SIMILAR">Avisos</a>
+        <a class="btn btn-small {% if active_action == 'ERROR' %}btn-primary{% else %}btn-secondary{% endif %}" href="/imports/{{ batch.id }}?action=ERROR">Errores</a>
+    </div>
+</section>
+
+<section class="card import-decision-panel">
+    <div class="card-header">
+        <h3>Decision de aplicacion</h3>
+        {% if created_sample_ids %}
+        <a class="btn btn-secondary" href="/labels?ids={{ created_sample_ids_csv }}">
+            <i class="fa-solid fa-tags"></i> Etiquetas creadas
+        </a>
+        <form method="post" action="/imports/{{ batch.id }}/delete-created" onsubmit="return confirm('Se eliminaran solo las muestras creadas por esta importacion. No se borraran muestras externas. ¿Continuar?');">
+            <button type="submit" class="btn btn-danger"><i class="fa-solid fa-trash"></i> Eliminar muestras creadas por esta importacion</button>
+        </form>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <div class="import-decision-summary">
+            <div><span>Pendientes CREATE</span><strong>{{ pending_create_count }}</strong></div>
+            <div><span>Ya creadas</span><strong>{{ applied_create_count }}</strong></div>
+            <div><span>Excluidas manualmente</span><strong>{{ manual_skip_count }}</strong></div>
+            <div><span>Estado batch</span><strong>{{ batch.status }}</strong></div>
+        </div>
+    </div>
+</section>
+
+{% if duplicate_groups %}
+<section class="card">
+    <div class="card-header">
+        <h3>Grupos duplicados</h3>
+    </div>
+    <div class="card-body table-responsive">
+        <table class="table import-preview-table">
+            <thead>
+                <tr>
+                    <th>Identity key</th>
+                    <th>N filas</th>
+                    <th>Pestanas</th>
+                    <th>Filas Excel</th>
+                    <th>Proveedor</th>
+                    <th>Referencia</th>
+                    <th>CVC</th>
+                    <th>Calidad</th>
+                    <th>Origen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in duplicate_groups %}
+                <tr>
+                    <td>{{ group.identity_key }}</td>
+                    <td>{{ group.count }}</td>
+                    <td>{{ group.sheets|join(', ') }}</td>
+                    <td>{{ group.rows|join(', ') }}</td>
+                    <td>{{ group.provider or '-' }}</td>
+                    <td>{{ group.supplier_reference or '-' }}</td>
+                    <td>{{ group.purchase_contract_cvc or '-' }}</td>
+                    <td>{{ group.quality or '-' }}</td>
+                    <td>{{ group.origin or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+
+<section class="card">
+    <div class="card-header">
+        <h3>Previsualizacion de filas</h3>
+    </div>
+    <div class="card-body table-responsive">
+        <form id="apply-import-form" method="post" action="/imports/{{ batch.id }}/apply">
+            {% if batch.status in ["preview", "partial_applied"] %}
+            <div class="import-toolbar import-apply-toolbar">
+                <button type="button" class="btn btn-secondary btn-small" data-import-action="select-create">Seleccionar todas las CREATE_CANDIDATE</button>
+                <button type="button" class="btn btn-secondary btn-small" data-import-action="select-visible">Seleccionar visibles filtradas</button>
+                <button type="button" class="btn btn-secondary btn-small" data-import-action="clear">Deseleccionar todas</button>
+                <button type="button" class="btn btn-secondary btn-small" data-import-action="exclude-selected">Excluir seleccionadas</button>
+                <span class="import-selection-counter"><strong id="selected-create-count">0</strong> filas CREATE_CANDIDATE seleccionadas para crear</span>
+                <button class="btn btn-primary" type="submit">
+                    <i class="fa-solid fa-check"></i> Aplicar filas seleccionadas
+                </button>
+            </div>
+            {% endif %}
+            <table class="table import-preview-table">
+                <thead>
+                    <tr>
+                        <th>Aplicar</th>
+                        <th>Fila</th>
+                        <th>Pestana origen</th>
+                        <th>Proveedor</th>
+                        <th>Referencia</th>
+                        <th>CVC</th>
+                        <th>Origen</th>
+                        <th>Calidad</th>
+                        <th>Cantidad</th>
+                        <th>Accion propuesta</th>
+                        <th>Decision</th>
+                        <th>Errores</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in rows %}
+                    {% set row = item.row %}
+                    {% set data = item.normalized %}
+                    {% set can_apply = row.proposed_action == "CREATE_CANDIDATE" and row.final_action is none and row.status != "applied" %}
+                    <tr class="{% if row.status == 'applied' %}row-applied{% elif row.status == 'skipped' %}row-skipped{% endif %}">
+                        <td>
+                            {% if can_apply and batch.status in ["preview", "partial_applied"] %}
+                                <input class="import-row-check candidate-row" type="checkbox" name="selected_row_ids" value="{{ row.id }}" checked>
+                                <input type="hidden" name="candidate_row_ids" value="{{ row.id }}">
+                            {% elif row.final_action == "APPLY_CREATE" %}
+                                <input type="checkbox" checked disabled>
+                            {% else %}
+                                <input type="checkbox" disabled>
+                            {% endif %}
+                        </td>
+                        <td>{{ row.row_number }}</td>
+                        <td>{{ row.source_sheet or '-' }}</td>
+                        <td>{{ data.provider or '-' }}</td>
+                        <td>{{ data.supplier_reference or '-' }}</td>
+                        <td>{{ data.purchase_contract_cvc or '-' }}</td>
+                        <td>{{ data.origin or '-' }}</td>
+                        <td>{{ data.quality or '-' }}</td>
+                        <td>{% if data.quantity_g is not none %}{{ data.quantity_g }} g{% else %}-{% endif %}</td>
+                        <td><span class="import-action import-action-{{ row.proposed_action|lower }}">{{ row.proposed_action }}</span></td>
+                        <td>
+                            {% if row.final_action %}
+                                <span class="import-final-action">{{ row.final_action }}</span>
+                            {% elif row.proposed_action == "CREATE_CANDIDATE" %}
+                                <span class="import-final-action pending">Pendiente</span>
+                            {% else %}
+                                <span class="import-final-action blocked">Bloqueada</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% for warning in item.warnings %}
+                                <div class="import-message warning">{{ warning }}</div>
+                            {% endfor %}
+                            {% for error in item.errors %}
+                                <div class="import-message error">{{ error }}</div>
+                            {% endfor %}
+                            {% if not item.warnings and not item.errors %}-{% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="12" class="empty">No hay filas utiles en esta importacion.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </form>
+    </div>
+</section>
+
+<script>
+(() => {
+    const form = document.getElementById("apply-import-form");
+    const counter = document.getElementById("selected-create-count");
+    const enabledChecks = () => Array.from(document.querySelectorAll(".candidate-row:not(:disabled)"));
+    const updateCounter = () => {
+        if (!counter) return;
+        counter.textContent = enabledChecks().filter((check) => check.checked).length;
+    };
+
+    document.querySelectorAll("[data-import-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+            const action = button.dataset.importAction;
+            const checks = enabledChecks();
+            if (action === "select-create" || action === "select-visible") {
+                checks.forEach((check) => { check.checked = true; });
+            }
+            if (action === "clear") {
+                checks.forEach((check) => { check.checked = false; });
+            }
+            if (action === "exclude-selected") {
+                checks.filter((check) => check.checked).forEach((check) => { check.checked = false; });
+            }
+            updateCounter();
+        });
+    });
+
+    enabledChecks().forEach((check) => {
+        check.addEventListener("change", updateCounter);
+    });
+
+    if (form) {
+        form.addEventListener("submit", (event) => {
+            const checks = enabledChecks();
+            const selected = checks.filter((check) => check.checked).length;
+            if (checks.length > 0 && selected === 0) {
+                event.preventDefault();
+                window.alert("Selecciona al menos una fila CREATE_CANDIDATE para aplicar.");
+                return;
+            }
+            const message = `Se crearan ${selected} muestras. Las no seleccionadas quedaran excluidas. ¿Continuar?`;
+            if (!window.confirm(message)) {
+                event.preventDefault();
+            }
+        });
+    }
+    updateCounter();
+})();
+</script>
+{% endblock %}
