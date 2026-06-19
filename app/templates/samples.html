@@ -33,11 +33,11 @@
             <input type="search" name="purchase_cvc" value="{{ filters.purchase_cvc if filters else '' }}" placeholder="Contrato CVC">
         </div>
         <div>
-            <label>Pais</label>
+            <label>País</label>
             <select name="country">
                 <option value="">Todos los paises</option>
-                {% for code, country in countries.items() %}
-                    <option value="{{ code }}" {% if filters and filters.country == code %}selected{% endif %}>{{ country.flag }} {{ country.name }}</option>
+                {% for country in country_options %}
+                    <option value="{{ country.value }}" {% if filters and filters.country == country.value %}selected{% endif %}>{{ country.label }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -85,7 +85,7 @@
                 <thead>
                     <tr>
                         <th>Código</th>
-                        <th>Pais</th>
+                        <th>País</th>
                         <th>Origen</th>
                         <th>Variedad</th>
                         <th>CVC</th>
@@ -98,11 +98,11 @@
                     {% for sample in samples %}
                     <tr>
                         <td><input type="checkbox" class="label-check" name="sample_ids" value="{{ sample.id }}"> <a href="/samples/{{ sample.id }}">{{ sample.code }}</a></td>
-                        <td>{{ sample.country_name }}</td>
-                        <td>{{ sample.origin }}</td>
-                        <td>{{ sample.variety }}</td>
-                        <td>{{ sample.purchase_contract_cvc or '-' }}</td>
-                        <td>{{ sample.available_quantity_g }} g</td>
+                        <td>{{ sample_country_display(sample) or '-' }}</td>
+                        <td>{{ display_value(sample.origin) }}</td>
+                        <td>{{ display_value(sample.variety) }}</td>
+                        <td>{{ display_value(sample.purchase_contract_cvc) }}</td>
+                        <td>{{ sample.available_quantity_g or 0 }} g</td>
                         <td><span class="status-badge status-{{ status_class(sample.status) }}">{{ status_label(sample.status) }}</span></td>
                         <td><a href="/samples/{{ sample.id }}" class="btn btn-small btn-secondary"><i class="fa-solid fa-arrow-right"></i> Detalle</a></td>
                     </tr>

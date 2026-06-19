@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, or_
 from datetime import datetime
 from pathlib import Path
 import qrcode
@@ -107,11 +107,88 @@ def tasting_result_label(result) -> str:
         result = result.value
     return TASTING_RESULT_LABELS.get(str(result), str(result).title())
 
+
+def _sample_country_display(sample: Sample) -> str:
+    country_name = display_value(sample.country_name, "")
+    if country_name:
+        return country_name
+    if sample.country_code and get_country_name(sample.country_code):
+        return get_country_name(sample.country_code)
+    origin_country = _origin_country_candidate(sample.origin)
+    if origin_country:
+        return origin_country
+    return ""
+
+
+def display_value(value, default="-"):
+    if value is None:
+        return default
+    text = str(value).strip()
+    if not text or text.lower() in {"none", "null", "nan", "-"}:
+        return default
+    return text
+
+
+def _origin_country_candidate(origin) -> str:
+    key = _normalize_origin_key(origin)
+    if not key:
+        return ""
+    aliases = [
+        ("costa de marfil", "Costa de Marfil"),
+        ("cote d ivoire", "Costa de Marfil"),
+        ("cote divoire", "Costa de Marfil"),
+        ("ivory coast", "Costa de Marfil"),
+        ("sierra leona", "Sierra Leona"),
+        ("sierra leone", "Sierra Leona"),
+        ("brasil", "Brasil"),
+        ("brazil", "Brasil"),
+        ("vietnam", "Vietnam"),
+        ("viet nam", "Vietnam"),
+        ("vietnem", "Vietnam"),
+        ("uganda", "Uganda"),
+        ("colombia", "Colombia"),
+        ("peru", "Perú"),
+        ("mexico", "Mexico"),
+        ("honduras", "Honduras"),
+        ("india", "India"),
+        ("ruanda", "Ruanda"),
+        ("rwanda", "Ruanda"),
+        ("tanzania", "Tanzania"),
+        ("angola", "Angola"),
+        ("cameroun", "Cameroun"),
+        ("cameroon", "Cameroun"),
+        ("congo", "Congo"),
+        ("cuba", "Cuba"),
+        ("guinea", "Guinea"),
+        ("venezuela", "Venezuela"),
+    ]
+    for alias, label in aliases:
+        if key == alias or key.startswith(f"{alias} "):
+            return label
+    return ""
+
+
+def _sample_country_options(db: Session) -> list[dict]:
+    seen = {}
+    for sample in db.query(Sample).all():
+        display = _sample_country_display(sample)
+        if not display:
+            continue
+        key = _normalize_origin_key(display)
+        if key and key not in seen:
+            seen[key] = display
+    return [
+        {"value": display, "label": display}
+        for display in sorted(seen.values(), key=lambda value: _normalize_origin_key(value))
+    ]
+
 logo_exists = (Path(__file__).parent / "static" / "logo.png").exists()
 
 templates.env.globals["status_label"] = status_label
 templates.env.globals["status_class"] = status_class
 templates.env.globals["tasting_result_label"] = tasting_result_label
+templates.env.globals["sample_country_display"] = _sample_country_display
+templates.env.globals["display_value"] = display_value
 templates.env.globals["logo_exists"] = logo_exists
 
 
@@ -270,7 +347,11 @@ async def list_samples(
         if normalized_status in {s.value for s in SampleStatus}:
             query = query.filter(Sample.status == normalized_status)
     if country:
-        query = query.filter(Sample.country_code == country)
+        query = query.filter(or_(
+            Sample.country_code == country,
+            Sample.country_name.ilike(f"%{country}%"),
+            Sample.origin.ilike(f"%{country}%"),
+        ))
     if producer:
         query = query.filter(Sample.producer.ilike(f"%{producer}%"))
     if origin:
@@ -301,7 +382,7 @@ async def list_samples(
     return templates.TemplateResponse("samples.html", {
         "request": request,
         "samples": samples,
-        "countries": get_all_countries(),
+        "country_options": _sample_country_options(db),
         "statuses": [{"value": s.value, "label": status_label(s.value)} for s in SampleStatus],
         "message": message,
         "filters": {
@@ -1321,6 +1402,14 @@ def _normalize_origin_key(origin) -> str:
     return re.sub(r"\s+", " ", text)
 
 
+def _quality_style_flags(quality) -> tuple[bool, bool]:
+    key = _normalize_origin_key(quality)
+    tokens = set(key.split())
+    eco = bool(tokens.intersection({"eco", "ecologico", "organico", "organic", "bio"}))
+    decaf = any(marker in key for marker in ["descafeinado", "decaf", "decaff", "decaffeinated", "desca"])
+    return eco, decaf
+
+
 def get_origin_flag_colors(origin) -> list[str]:
     if not origin:
         return []
@@ -1461,11 +1550,39 @@ def _draw_avery_l7108rev_label(c, sample: Sample, x: float, y: float, qr_data: s
         c.drawString(text_x, text_y, text)
         text_y -= line_gap
 
+    def draw_quality_line(value):
+        nonlocal text_y
+        eco, decaf = _quality_style_flags(value)
+        text = f"Calidad: {value or '-'}"
+        if len(text) > 42:
+            text = text[:39] + "..."
+        if eco or decaf:
+            bg = "#F4DFC8" if decaf else "#DDEEDB"
+            fg = "#5B351E" if decaf else "#244D2E"
+            c.setFillColor(HexColor(bg))
+            c.roundRect(text_x - 1.2 * mm, text_y - 2.4 * mm, max_text_width + 2.4 * mm, 4.6 * mm, 1.2 * mm, stroke=0, fill=1)
+            c.setFillColor(HexColor(fg))
+            c.setFont("Helvetica-Bold", 7.2)
+            c.drawString(text_x, text_y, text)
+            if eco and decaf:
+                badge_w = 8 * mm
+                badge_x = text_x + max_text_width - badge_w
+                c.setFillColor(HexColor("#BFDDB8"))
+                c.roundRect(badge_x, text_y - 2.1 * mm, badge_w, 4 * mm, 1 * mm, stroke=0, fill=1)
+                c.setFillColor(HexColor("#244D2E"))
+                c.setFont("Helvetica-Bold", 5.8)
+                c.drawCentredString(badge_x + badge_w / 2, text_y - 0.45 * mm, "ECO")
+        else:
+            c.setFillColor(HexColor("#111827"))
+            c.setFont("Helvetica", 7.4)
+            c.drawString(text_x, text_y, text)
+        text_y -= line_gap
+
     c.setFont("Helvetica-Bold", 9)
     c.setFillColor(HexColor("#153F2B"))
     c.drawString(text_x, text_y, "Indian Ecotrade")
     text_y -= line_gap
-    draw_line("Calidad", sample.quality)
+    draw_quality_line(sample.quality)
     draw_line("Proveedor", sample.producer)
     draw_line("Ref. proveedor", sample.supplier_reference)
     if label_cvc:
