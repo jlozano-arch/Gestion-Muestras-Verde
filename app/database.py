@@ -175,6 +175,7 @@ def create_tables():
                 existing_import_rows = {row[1] for row in res_import_rows.fetchall()}
                 import_row_extras = {
                     'source_sheet': 'TEXT',
+                    'source_sheet_key': 'TEXT',
                     'final_action': 'TEXT',
                     'status': 'TEXT',
                     'sample_id': 'INTEGER',

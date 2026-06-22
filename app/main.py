@@ -22,7 +22,7 @@ import re
 import unicodedata
 from urllib.parse import quote_plus
 
-from .database import get_db, create_tables
+from .database import get_db, create_tables, SessionLocal
 from .models import Sample, Tasting, Shipment, Event, Document, SampleStatus, ImportBatch, ImportRow
 from .countries import get_country_name, get_country_flag, get_all_countries
 
@@ -172,9 +172,19 @@ def _origin_country_candidate(origin) -> str:
         ("peru", "Perú"),
         ("mexico", "Mexico"),
         ("honduras", "Honduras"),
+        ("guatemala", "Guatemala"),
+        ("costa rica", "Costa Rica"),
+        ("el salvador", "El Salvador"),
+        ("nicaragua", "Nicaragua"),
         ("india", "India"),
+        ("indonesia", "Indonesia"),
+        ("etiopia", "Etiopia"),
+        ("ethiopia", "Etiopia"),
+        ("kenia", "Kenia"),
+        ("kenya", "Kenia"),
         ("ruanda", "Ruanda"),
         ("rwanda", "Ruanda"),
+        ("burundi", "Burundi"),
         ("tanzania", "Tanzania"),
         ("angola", "Angola"),
         ("cameroun", "Cameroun"),
@@ -188,6 +198,83 @@ def _origin_country_candidate(origin) -> str:
         if key == alias or key.startswith(f"{alias} "):
             return label
     return ""
+
+
+def _country_code_for_name(country_name: str) -> str:
+    country_key = _normalize_origin_key(country_name)
+    if not country_key:
+        return ""
+    for code, country in get_all_countries().items():
+        if _normalize_origin_key(country.get("name")) == country_key:
+            return code
+    aliases = {
+        "peru": "PE",
+        "mexico": "MX",
+        "colombia": "CO",
+        "brasil": "BR",
+        "brazil": "BR",
+        "honduras": "HN",
+        "guatemala": "GT",
+        "costa rica": "CR",
+        "el salvador": "SV",
+        "uganda": "UG",
+        "kenia": "KE",
+        "kenya": "KE",
+        "etiopia": "ETH",
+        "ethiopia": "ETH",
+        "vietnam": "VN",
+        "viet nam": "VN",
+        "india": "IN",
+        "indonesia": "ID",
+        "sierra leona": "SL",
+        "sierra leone": "SL",
+        "costa de marfil": "CI",
+        "cote d ivoire": "CI",
+        "ivory coast": "CI",
+    }
+    return aliases.get(country_key, "")
+
+
+def _normalize_country_name(value) -> str:
+    text = display_value(value, "")
+    if not text:
+        return ""
+    code = text.upper()
+    if code in get_all_countries():
+        return get_country_name(code)
+    return _origin_country_candidate(text) or text
+
+
+def _split_country_origin(country_value, origin_value) -> tuple[str, str, str]:
+    country_name = _normalize_country_name(country_value)
+    origin_text = display_value(origin_value, "")
+    origin_country = _origin_country_candidate(origin_text)
+    if not country_name and origin_country:
+        country_name = origin_country
+        origin_text = ""
+    elif country_name and origin_country and _normalize_origin_key(country_name) == _normalize_origin_key(origin_country):
+        origin_text = ""
+    country_code = _country_code_for_name(country_name)
+    return country_code, country_name, origin_text
+
+
+def _normalize_sample_country_origin(sample: Sample) -> bool:
+    country_code, country_name, origin = _split_country_origin(
+        sample.country_name or sample.country_code,
+        sample.origin,
+    )
+    changed = False
+    if country_name and sample.country_name != country_name:
+        sample.country_name = country_name
+        changed = True
+    if country_code and sample.country_code != country_code:
+        sample.country_code = country_code
+        changed = True
+    normalized_origin = origin or None
+    if (sample.origin or None) != normalized_origin:
+        sample.origin = normalized_origin
+        changed = True
+    return changed
 
 
 def _sample_country_options(db: Session) -> list[dict]:
@@ -212,6 +299,37 @@ templates.env.globals["tasting_result_label"] = tasting_result_label
 templates.env.globals["sample_country_display"] = _sample_country_display
 templates.env.globals["display_value"] = display_value
 templates.env.globals["logo_exists"] = logo_exists
+
+
+def _normalize_existing_sample_countries(db: Session) -> list[dict]:
+    examples = []
+    for sample in db.query(Sample).all():
+        before = {
+            "id": sample.id,
+            "code": sample.code,
+            "country": sample.country_name,
+            "origin": sample.origin,
+        }
+        if _normalize_sample_country_origin(sample):
+            after = {
+                "id": sample.id,
+                "code": sample.code,
+                "country": sample.country_name,
+                "origin": sample.origin,
+            }
+            examples.append({"before": before, "after": after})
+    return examples
+
+
+@app.on_event("startup")
+async def normalize_sample_countries_on_startup():
+    db = SessionLocal()
+    try:
+        changed = _normalize_existing_sample_countries(db)
+        if changed:
+            db.commit()
+    finally:
+        db.close()
 
 
 def _public_base_url(request: Request) -> str:
@@ -574,11 +692,12 @@ async def create_sample(
     except (ValueError, TypeError):
         available_quantity_g = received_quantity_g
 
+    normalized_country_code, normalized_country_name, normalized_origin = _split_country_origin(country_code, origin)
     sample = Sample(
         code=code,
-        country_code=country_code,
-        country_name=get_country_name(country_code) if country_code else None,
-        origin=origin,
+        country_code=normalized_country_code or country_code,
+        country_name=normalized_country_name or (get_country_name(country_code) if country_code else None),
+        origin=normalized_origin,
         producer=producer,
         supplier_reference=supplier_reference,
         provider_sample_number=provider_sample_number,
@@ -731,9 +850,10 @@ async def update_sample(
         raise HTTPException(status_code=400, detail="La cantidad disponible no puede ser mayor que la cantidad recibida")
 
     sample.code = code
-    sample.country_code = country_code
-    sample.country_name = get_country_name(country_code) if country_code else None
-    sample.origin = origin
+    normalized_country_code, normalized_country_name, normalized_origin = _split_country_origin(country_code, origin)
+    sample.country_code = normalized_country_code or country_code
+    sample.country_name = normalized_country_name or (get_country_name(country_code) if country_code else None)
+    sample.origin = normalized_origin
     sample.producer = producer
     sample.supplier_reference = supplier_reference
     sample.provider_sample_number = provider_sample_number
@@ -1928,14 +2048,6 @@ IMPORT_HEADER_ALIASES = {
     "notes": {"notes", "notas", "comments", "comentarios", "comentarios de los clientes", "comentarios clientes"},
 }
 
-IMPORT_SOURCE_SHEETS = {
-    "Robusta America": "ROBUSTA_AMERICA",
-    "Robusta Africa": "ROBUSTA_AFRICA",
-    "Robusta Asia": "ROBUSTA_ASIA",
-    "Descafeinados": "DESCAFEINADOS",
-}
-
-
 def _normalize_header(value):
     text = str(value or "").strip().lower()
     text = re.sub(r"[\s\-/]+", " ", text)
@@ -1950,6 +2062,93 @@ def _canonical_header(value):
         if normalized in aliases or normalized_underscore in aliases:
             return canonical
     return normalized_underscore or None
+
+
+IMPORT_HEADER_ALIASES = {
+    "date": {"fecha", "date"},
+    "provider": {"provider", "proveedor", "supplier"},
+    "supplier_reference": {
+        "ref proveedor",
+        "referencia proveedor",
+        "supplier reference",
+        "supplier ref",
+        "reference",
+    },
+    "purchase_contract_cvc": {
+        "cvc",
+        "contrato cvc",
+        "purchase contract",
+        "contrato compra",
+    },
+    "contract_quantity": {"cantidad contrato", "contract quantity", "sacos contrato"},
+    "country": {"country", "pais"},
+    "origin": {"origin", "origen"},
+    "quality": {"quality", "calidad", "description", "descripcion"},
+    "quantity": {"quantity", "cantidad", "sample qty"},
+    "quantity_g": {"quantity g", "cantidad g", "gramos", "received quantity g"},
+    "status": {"status", "estado"},
+    "container_number": {
+        "container number",
+        "container",
+        "contenedor",
+        "numero contenedor",
+        "n contenedor",
+        "no contenedor",
+    },
+    "warehouse": {"warehouse", "almacen", "almacen warehouse"},
+    "tasting_date": {"fecha cata", "fehca cata", "cupping date", "tasting date"},
+    "code": {"code", "codigo", "codigo interno", "internal code"},
+    "variety": {"variety", "variedad"},
+    "processing": {"processing", "proceso", "process"},
+    "harvest_date": {"harvest date", "cosecha", "harvest", "fecha cosecha"},
+    "altitude": {"altitude", "altitud"},
+    "notes": {
+        "notes",
+        "notas",
+        "comments",
+        "comentarios",
+        "observaciones",
+        "comentarios de los clientes",
+        "comentarios clientes",
+    },
+}
+
+IMPORT_REQUIRED_HEADERS = {"provider", "supplier_reference"}
+IMPORT_CONTEXT_HEADERS = {"purchase_contract_cvc", "container_number", "origin", "country", "quality", "quantity", "quantity_g"}
+
+
+def _normalize_header(value):
+    text = str(value or "").strip().lower()
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    text = text.replace("º", " ").replace("ª", " ")
+    text = re.sub(r"[\r\n\t]+", " ", text)
+    text = re.sub(r"[\s\-/_.]+", " ", text)
+    text = re.sub(r"[^a-z0-9 ]", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _canonical_header(value):
+    normalized = _normalize_header(value)
+    normalized_underscore = normalized.replace(" ", "_")
+    for canonical, aliases in IMPORT_HEADER_ALIASES.items():
+        if normalized in aliases or normalized_underscore in aliases:
+            return canonical
+    return normalized_underscore or None
+
+
+def _source_sheet_key(sheet_name):
+    key = _normalize_header(sheet_name).upper().replace(" ", "_")
+    return key or "SHEET"
+
+
+def _find_import_header(sheet, max_scan_rows=15):
+    for row_number, row in enumerate(sheet.iter_rows(min_row=1, max_row=max_scan_rows, values_only=True), start=1):
+        headers = [_canonical_header(value) for value in row]
+        recognized = {header for header in headers if header in IMPORT_HEADER_ALIASES}
+        if IMPORT_REQUIRED_HEADERS.issubset(recognized) and recognized.intersection(IMPORT_CONTEXT_HEADERS):
+            return row_number, headers
+    return None, []
 
 
 def _clean_import_text(value):
@@ -2221,15 +2420,23 @@ async def imports_preview(file: UploadFile = File(...), db: Session = Depends(ge
         db.commit()
         raise HTTPException(status_code=400, detail=f"No se pudo leer el Excel: {exc}")
 
-    selected_sheets = [
-        (workbook[sheet_name], source_code)
-        for sheet_name, source_code in IMPORT_SOURCE_SHEETS.items()
-        if sheet_name in workbook.sheetnames
-    ]
+    selected_sheets = []
+    ignored_sheets = []
+    for sheet_name in workbook.sheetnames:
+        sheet = workbook[sheet_name]
+        header_row_number, headers = _find_import_header(sheet)
+        if header_row_number:
+            selected_sheets.append((sheet, sheet_name, _source_sheet_key(sheet_name), header_row_number, headers))
+        else:
+            ignored_sheets.append(sheet_name)
     if not selected_sheets:
         batch.status = "failed"
         db.commit()
-        raise HTTPException(status_code=400, detail="No se encontraron pestañas Robusta America, Robusta Africa, Robusta Asia o Descafeinados")
+        detected = ", ".join(workbook.sheetnames) if workbook.sheetnames else "sin pestañas"
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se encontraron pestañas con cabeceras de muestras reconocibles. Pestañas detectadas: {detected}",
+        )
 
     staged = []
     identity_counts = {}
@@ -2240,14 +2447,12 @@ async def imports_preview(file: UploadFile = File(...), db: Session = Depends(ge
         if identity_key and identity_level != "incomplete":
             existing_by_identity[identity_key] = sample
 
-    for sheet, source_code in selected_sheets:
-        header_values = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), [])
-        headers = [_canonical_header(value) for value in header_values]
+    for sheet, source_sheet, source_sheet_key, header_row_number, headers in selected_sheets:
         useful_headers = {header for header in headers if header}
         if not useful_headers:
             continue
 
-        for row_number, values in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+        for row_number, values in enumerate(sheet.iter_rows(min_row=header_row_number + 1, values_only=True), start=header_row_number + 1):
             raw = {}
             for index, value in enumerate(values):
                 if index < len(headers) and headers[index]:
@@ -2274,6 +2479,10 @@ async def imports_preview(file: UploadFile = File(...), db: Session = Depends(ge
                 "altitude": _clean_import_text(raw.get("altitude")),
                 "notes": _clean_import_text(raw.get("notes")),
             }
+            country_code, country_name, origin_name = _split_country_origin(normalized["country"], normalized["origin"])
+            normalized["country_code"] = country_code
+            normalized["country"] = country_name
+            normalized["origin"] = origin_name
             row_errors = []
             has_quantity_value = raw.get("quantity") not in (None, "") or raw.get("quantity_g") not in (None, "")
             if has_quantity_value and normalized["quantity_g"] is None:
@@ -2290,7 +2499,8 @@ async def imports_preview(file: UploadFile = File(...), db: Session = Depends(ge
 
             staged.append({
                 "row_number": row_number,
-                "source_sheet": source_code,
+                "source_sheet": source_sheet,
+                "source_sheet_key": source_sheet_key,
                 "raw": raw,
                 "normalized": normalized,
                 "identity_key": identity_key,
@@ -2331,6 +2541,7 @@ async def imports_preview(file: UploadFile = File(...), db: Session = Depends(ge
             batch_id=batch.id,
             row_number=item["row_number"],
             source_sheet=item["source_sheet"],
+            source_sheet_key=item["source_sheet_key"],
             raw_data_json=json.dumps(item["raw"], ensure_ascii=False, default=str),
             normalized_data_json=json.dumps(normalized, ensure_ascii=False, default=str),
             identity_key=identity_key,
@@ -2396,9 +2607,9 @@ async def imports_apply(
                 status_value = data.get("status") or SampleStatus.RECEIVED.value
                 sample = Sample(
                     code=_generate_import_sample_code(db, batch.id, row.id),
-                    country_code=data.get("country"),
-                    country_name=get_country_name(data.get("country")) if data.get("country") else None,
-                    origin=data.get("origin") or "",
+                    country_code=data.get("country_code"),
+                    country_name=data.get("country"),
+                    origin=data.get("origin") or None,
                     producer=data.get("provider") or "",
                     supplier_reference=data.get("supplier_reference"),
                     container_number=data.get("container_number"),
@@ -2644,11 +2855,12 @@ async def import_excel(file: UploadFile = File(...), db: Session = Depends(get_d
                     errors.append(f"Row {row_idx}: Código duplicado")
                     continue
 
+                normalized_country_code, normalized_country_name, normalized_origin = _split_country_origin(country, origin)
                 sample = Sample(
                     code=str(code).strip(),
-                    country_code=str(country).strip()[:5] if country else None,
-                    country_name=get_country_name(str(country).strip()[:5]) if country else None,
-                    origin=str(origin).strip() if origin else "",
+                    country_code=normalized_country_code or (str(country).strip()[:5] if country else None),
+                    country_name=normalized_country_name or (get_country_name(str(country).strip()[:5]) if country else None),
+                    origin=normalized_origin,
                     producer=str(producer).strip() if producer else "",
                     supplier_reference=str(supplier_reference).strip() if supplier_reference else None,
                     provider_sample_number=str(provider_sample_number).strip() if provider_sample_number else None,

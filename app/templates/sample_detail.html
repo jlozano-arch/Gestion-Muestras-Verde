@@ -7,7 +7,7 @@
     <div class="sample-hero-main">
         <span class="eyebrow"><i class="fa-solid fa-flask-vial"></i> Ficha tecnica</span>
         <h2>{{ sample.code }}</h2>
-        <p class="lead">{{ sample.origin or '-' }}, {{ sample.country_name or '-' }} - {{ sample.producer or '-' }}</p>
+        <p class="lead">{{ sample_country_display(sample) or '-' }}{% if sample.origin %}, {{ sample.origin }}{% endif %} - {{ sample.producer or '-' }}</p>
         <div class="sample-hero-meta">
             <span class="status-badge status-{{ status_class(sample.status) }}">{{ status_label(sample.status) }}</span>
             <span><i class="fa-solid fa-boxes-stacked"></i> {{ sample.available_quantity_g or 0 }} / {{ sample.received_quantity_g or 0 }} g</span>
@@ -61,14 +61,14 @@
                 </div>
             </div>
             <div class="info-grid">
+                <div class="info-card"><h4>Pais</h4><p>{{ sample_country_display(sample) or '-' }}</p></div>
                 <div class="info-card"><h4>Origen</h4><p>{{ sample.origin or '-' }}</p></div>
-                <div class="info-card"><h4>Pais</h4><p>{{ sample.country_name or '-' }}</p></div>
                 <div class="info-card"><h4>Productor</h4><p>{{ sample.producer or '-' }}</p></div>
                 <div class="info-card"><h4>Referencia proveedor</h4><p>{{ sample.supplier_reference or '-' }}</p></div>
                 <div class="info-card"><h4>Nº muestra proveedor</h4><p>{{ sample.provider_sample_number or '-' }}</p></div>
                 <div class="info-card"><h4>Nº de Contenedor</h4><p>{{ sample.container_number or '-' }}</p></div>
                 <div class="info-card"><h4>Contrato CVC</h4><p>{{ sample.purchase_contract_cvc or '-' }}</p></div>
-                <div class="info-card"><h4>Contrato CVV</h4><p>{{ sample.sales_contract_cvv or '-' }}</p></div>
+                <div class="info-card"><h4>Cantidad Contrato</h4><p>{{ sample.sales_contract_cvv or '-' }}</p></div>
                 <div class="info-card"><h4>Almacen</h4><p>{{ sample.warehouse or '-' }}</p></div>
                 <div class="info-card"><h4>Ubicacion fisica</h4><p>{{ sample.physical_location or '-' }}</p></div>
             </div>

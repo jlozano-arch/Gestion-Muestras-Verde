@@ -214,6 +214,7 @@ class ImportRow(Base):
     batch_id = Column(Integer, ForeignKey("import_batches.id"), index=True)
     row_number = Column(Integer)
     source_sheet = Column(String(80), index=True)
+    source_sheet_key = Column(String(120), index=True)
     raw_data_json = Column(Text)
     normalized_data_json = Column(Text)
     identity_key = Column(String(500), index=True)
