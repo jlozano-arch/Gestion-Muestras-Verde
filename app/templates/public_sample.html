@@ -9,58 +9,118 @@
             <span class="eyebrow"><i class="fa-solid fa-qrcode"></i> Ficha publica</span>
             <div class="public-country">{{ sample_country_with_flag(sample) or sample_country_display(sample) or '-' }}</div>
             <h2>{{ display_value(sample.quality, 'Sin calidad') }}</h2>
-            {% if sample.variety %}<div class="public-type-line">{% for badge in sample_type_badges(sample.variety) %}<span class="{{ badge.class }}">{{ badge.label }}</span>{% endfor %}</div>{% endif %}
+            {% if sample.variety %}
+            <div class="public-type-line">
+                {% for badge in sample_type_badges(sample.variety) %}
+                <span class="{{ badge.class }}">{{ badge.label }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="public-status-line">
+                <span class="status-badge status-{{ status_class(sample.status) }}">{{ status_label(sample.status) }}</span>
+            </div>
         </header>
 
-        <div class="public-key-data">
-            <div class="public-data-row">
-                <span>Proveedor</span>
-                <strong>{{ display_value(sample.producer) }}</strong>
+        <section class="public-section first">
+            <h3>Identificacion comercial</h3>
+            <div class="public-key-data">
+                <div class="public-data-row important">
+                    <span>Proveedor</span>
+                    <strong>{{ display_value(sample.producer) }}</strong>
+                </div>
+                <div class="public-data-row important">
+                    <span>Referencia proveedor</span>
+                    <strong>{{ display_value(sample.supplier_reference) }}</strong>
+                </div>
+                <div class="public-data-row">
+                    <span>CVC</span>
+                    <strong>{{ display_value(sample.purchase_contract_cvc) }}</strong>
+                </div>
+                <div class="public-data-row">
+                    <span>Cantidad contrato</span>
+                    <strong>{{ display_value(sample.sales_contract_cvv) }}</strong>
+                </div>
+                <div class="public-data-row">
+                    <span>Contenedor</span>
+                    <strong>{{ display_value(sample.container_number) }}</strong>
+                </div>
+                <div class="public-data-row">
+                    <span>Almacen</span>
+                    <strong>{{ display_value(sample.warehouse) }}</strong>
+                </div>
+                <div class="public-data-row muted">
+                    <span>Codigo interno</span>
+                    <strong>{{ display_value(sample.code) }}</strong>
+                </div>
             </div>
-            <div class="public-data-row">
-                <span>Referencia</span>
-                <strong>{{ display_value(sample.supplier_reference) }}</strong>
-            </div>
-            <div class="public-data-row">
-                <span>Contrato</span>
-                <strong>{{ display_value(sample.purchase_contract_cvc) }}</strong>
-            </div>
-            {% if sample.sales_contract_cvv %}
-            <div class="public-data-row">
-                <span>Cantidad contrato</span>
-                <strong>{{ sample.sales_contract_cvv }}</strong>
-            </div>
-            {% endif %}
-            <div class="public-data-row">
-                <span>Stock</span>
-                <strong>{{ sample.available_quantity_g or 0 }} g</strong>
-            </div>
-            <div class="public-data-row">
-                <span>Estado</span>
-                <strong><span class="status-badge status-{{ status_class(sample.status) }}">{{ status_label(sample.status) }}</span></strong>
-            </div>
-            {% if sample.origin %}
-            <div class="public-data-row">
-                <span>Origen</span>
-                <strong>{{ sample.origin }}</strong>
-            </div>
-            {% endif %}
-        </div>
-
-        {% if sample.notes %}
-        <section class="public-notes">
-            <span>Notas</span>
-            <p>{{ sample.notes }}</p>
         </section>
-        {% endif %}
 
-        {% if latest_tasting %}
         <section class="public-section">
-            <h3>Ultima cata</h3>
-            <div class="public-score-grid">
-                <div><span>Indian</span><strong>{{ "%.1f"|format(latest_tasting.indian_score or 0) }}</strong></div>
-                <div><span>Taza</span><strong>{{ "%.1f"|format(latest_tasting.cup_score or 0) }}</strong></div>
-                <div><span>Resultado</span><strong>{{ tasting_result_label(latest_tasting.result) }}</strong></div>
+            <h3>Datos de muestra</h3>
+            <div class="public-key-data">
+                <div class="public-data-row">
+                    <span>Disponible</span>
+                    <strong>{{ sample.available_quantity_g or 0 }} g</strong>
+                </div>
+                <div class="public-data-row">
+                    <span>Recepcion</span>
+                    <strong>{{ sample.created_at.strftime('%d/%m/%Y') if sample.created_at else '-' }}</strong>
+                </div>
+                <div class="public-data-row">
+                    <span>Cosecha</span>
+                    <strong>{{ display_value(sample.harvest_date) }}</strong>
+                </div>
+                <div class="public-data-row">
+                    <span>Proceso</span>
+                    <strong>{{ display_value(sample.processing) }}</strong>
+                </div>
+                <div class="public-data-row">
+                    <span>Tipo</span>
+                    <strong>{{ display_value(sample.variety) }}</strong>
+                </div>
+                <div class="public-data-row">
+                    <span>Altitud</span>
+                    <strong>{% if sample.altitude %}{{ sample.altitude }} m.s.n.m.{% else %}-{% endif %}</strong>
+                </div>
+                {% if sample.origin %}
+                <div class="public-data-row">
+                    <span>Origen / zona</span>
+                    <strong>{{ sample.origin }}</strong>
+                </div>
+                {% endif %}
+            </div>
+            {% if sample.notes %}
+            <div class="public-notes">
+                <span>Notas generales</span>
+                <p>{{ sample.notes }}</p>
+            </div>
+            {% endif %}
+        </section>
+
+        <section class="public-section">
+            <h3>Cata</h3>
+            {% if latest_tasting %}
+            <div class="public-key-data">
+                <div class="public-data-row">
+                    <span>Fecha cata</span>
+                    <strong>{{ latest_tasting.tasting_date.strftime('%d/%m/%Y') if latest_tasting.tasting_date else '-' }}</strong>
+                </div>
+                <div class="public-data-row">
+                    <span>Resultado</span>
+                    <strong>{{ tasting_result_label(latest_tasting.result) }}</strong>
+                </div>
+                <div class="public-data-row">
+                    <span>Puntuacion total</span>
+                    <strong>{{ "%.1f"|format(latest_tasting.cup_score or latest_tasting.indian_score or 0) }}</strong>
+                </div>
+            </div>
+            <div class="public-score-grid sensory">
+                <div><span>Aroma</span><strong>{{ latest_tasting.aroma if latest_tasting.aroma is not none else '-' }}</strong></div>
+                <div><span>Acidez</span><strong>{{ latest_tasting.acidity if latest_tasting.acidity is not none else '-' }}</strong></div>
+                <div><span>Cuerpo</span><strong>{{ latest_tasting.body if latest_tasting.body is not none else '-' }}</strong></div>
+                <div><span>Equilibrio</span><strong>{{ latest_tasting.balance if latest_tasting.balance is not none else '-' }}</strong></div>
+                <div><span>Sabor</span><strong>{{ latest_tasting.flavor if latest_tasting.flavor is not none else '-' }}</strong></div>
+                <div><span>Regusto</span><strong>{{ latest_tasting.aftertaste if latest_tasting.aftertaste is not none else '-' }}</strong></div>
             </div>
             {% if latest_tasting.tasting_notes %}
             <div class="public-notes">
@@ -68,20 +128,27 @@
                 <p>{{ latest_tasting.tasting_notes }}</p>
             </div>
             {% endif %}
+            {% if latest_tasting.recommendations %}
+            <div class="public-notes">
+                <span>Observaciones</span>
+                <p>{{ latest_tasting.recommendations }}</p>
+            </div>
+            {% endif %}
+            <a class="btn btn-primary public-action" href="/samples/{{ sample.id }}/tastings/{{ latest_tasting.id }}/pdf" target="_blank" rel="noopener">
+                <i class="fa-solid fa-file-pdf"></i> Ver PDF de cata
+            </a>
+            {% else %}
+            <p class="empty">Sin catas registradas.</p>
+            {% endif %}
         </section>
-        {% endif %}
 
-        {% if documents %}
+        {% if public_images %}
         <section class="public-section">
-            <h3>Fotografias y documentos</h3>
-            <div class="public-documents">
-                {% for item in documents %}
-                <a class="public-document" href="{{ item.url }}" target="_blank" rel="noopener">
-                    {% if item.is_image %}
+            <h3>Fotografias</h3>
+            <div class="public-photo-grid">
+                {% for item in public_images %}
+                <a class="public-photo" href="{{ item.url }}" target="_blank" rel="noopener">
                     <img src="{{ item.url }}" alt="{{ item.doc.file_name }}">
-                    {% else %}
-                    <i class="fa-solid fa-file-lines"></i>
-                    {% endif %}
                     <span>{{ item.doc.file_name }}</span>
                 </a>
                 {% endfor %}
@@ -89,11 +156,19 @@
         </section>
         {% endif %}
 
-        <footer class="public-internal-code">
-            <span>Codigo interno</span>
-            <strong>{{ display_value(sample.code) }}</strong>
-        </footer>
+        {% if public_files %}
+        <section class="public-section">
+            <h3>Documentos</h3>
+            <div class="public-documents">
+                {% for item in public_files %}
+                <a class="public-document" href="{{ item.url }}" target="_blank" rel="noopener">
+                    <i class="fa-solid fa-file-lines"></i>
+                    <span>{{ item.doc.file_name }}</span>
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
     </section>
 </main>
 {% endblock %}
-

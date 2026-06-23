@@ -54,3 +54,4 @@ Thumbs.db
 # Project
 *.log
 uploads/
+app/*_old.py

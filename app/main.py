@@ -124,12 +124,43 @@ def _sample_country_with_flag(sample: Sample) -> str:
     country = _sample_country_display(sample)
     if not country:
         return ""
-    flag = ""
-    if sample.country_code and sample.country_code in get_all_countries():
-        candidate = get_country_flag(sample.country_code)
-        if candidate and candidate != get_country_flag(""):
-            flag = candidate
+    flag = _country_flag_for_sample(sample)
     return f"{flag} {country}".strip()
+
+
+def _country_flag_for_value(value) -> str:
+    key = _normalize_origin_key(value)
+    if not key:
+        return ""
+    code = str(value or "").strip().upper()
+    flags_by_code = {
+        "BR": "🇧🇷", "CO": "🇨🇴", "HN": "🇭🇳", "CI": "🇨🇮", "SL": "🇸🇱",
+        "UG": "🇺🇬", "VN": "🇻🇳", "PE": "🇵🇪", "MX": "🇲🇽", "GT": "🇬🇹",
+        "CR": "🇨🇷", "SV": "🇸🇻", "NI": "🇳🇮", "ETH": "🇪🇹", "KE": "🇰🇪",
+        "RW": "🇷🇼", "BI": "🇧🇮", "TZ": "🇹🇿", "IN": "🇮🇳", "ID": "🇮🇩",
+    }
+    if code in flags_by_code:
+        return flags_by_code[code]
+    flags_by_name = {
+        "brasil": "🇧🇷", "brazil": "🇧🇷", "colombia": "🇨🇴", "honduras": "🇭🇳",
+        "costa de marfil": "🇨🇮", "cote d ivoire": "🇨🇮", "cote divoire": "🇨🇮",
+        "ivory coast": "🇨🇮", "sierra leona": "🇸🇱", "sierra leone": "🇸🇱",
+        "uganda": "🇺🇬", "vietnam": "🇻🇳", "viet nam": "🇻🇳", "peru": "🇵🇪",
+        "mexico": "🇲🇽", "guatemala": "🇬🇹", "costa rica": "🇨🇷",
+        "el salvador": "🇸🇻", "nicaragua": "🇳🇮", "etiopia": "🇪🇹",
+        "ethiopia": "🇪🇹", "kenia": "🇰🇪", "kenya": "🇰🇪", "ruanda": "🇷🇼",
+        "rwanda": "🇷🇼", "burundi": "🇧🇮", "tanzania": "🇹🇿", "india": "🇮🇳",
+        "indonesia": "🇮🇩",
+    }
+    return flags_by_name.get(key, "")
+
+
+def _country_flag_for_sample(sample: Sample) -> str:
+    return (
+        _country_flag_for_value(sample.country_code)
+        or _country_flag_for_value(sample.country_name)
+        or _country_flag_for_value(sample.origin)
+    )
 
 
 def _sample_type_badge_class(value) -> str:
@@ -255,6 +286,7 @@ def _country_code_for_name(country_name: str) -> str:
         "guatemala": "GT",
         "costa rica": "CR",
         "el salvador": "SV",
+        "nicaragua": "NI",
         "uganda": "UG",
         "kenia": "KE",
         "kenya": "KE",
@@ -264,6 +296,10 @@ def _country_code_for_name(country_name: str) -> str:
         "viet nam": "VN",
         "india": "IN",
         "indonesia": "ID",
+        "ruanda": "RW",
+        "rwanda": "RW",
+        "burundi": "BI",
+        "tanzania": "TZ",
         "sierra leona": "SL",
         "sierra leone": "SL",
         "costa de marfil": "CI",
@@ -566,12 +602,16 @@ async def public_sample_detail(sample_id: int, request: Request, db: Session = D
             "photo_order": photo_order,
         })
     public_documents.sort(key=lambda item: (0 if item["is_image"] else 1, item["photo_order"], item["doc"].upload_date or datetime.min))
+    public_images = [item for item in public_documents if item["is_image"]]
+    public_files = [item for item in public_documents if not item["is_image"]]
 
     return templates.TemplateResponse("public_sample.html", {
         "request": request,
         "sample": sample,
         "latest_tasting": latest_tasting,
         "documents": public_documents,
+        "public_images": public_images,
+        "public_files": public_files,
         "public_url": _public_sample_url(request, sample.id),
     })
 
