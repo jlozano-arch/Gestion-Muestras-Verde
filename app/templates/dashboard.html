@@ -3,6 +3,15 @@
 {% block title %}Dashboard - Gestion de Muestras{% endblock %}
 
 {% block content %}
+{% macro dashboard_sample_cell(sample) -%}
+    {%- set identity = sample_dashboard_identity(sample) -%}
+    <a class="dashboard-sample-link" href="/samples/{{ sample.id }}">
+        <span class="sample-main">{{ identity.main }}</span>
+        {% if identity.meta %}<span class="sample-meta">{{ identity.meta }}</span>{% endif %}
+        {% if identity.code %}<span class="sample-code">Codigo interno {{ identity.code }}</span>{% endif %}
+    </a>
+{%- endmacro %}
+
 <section class="dashboard-opsbar">
     <div>
         <h2>Dashboard</h2>
@@ -33,18 +42,17 @@
         <div class="table-responsive ops-table-wrap">
             <table class="ops-table">
                 <thead>
-                    <tr><th>Codigo</th><th>Origen</th><th>Stock</th><th>Estado</th></tr>
+                    <tr><th>Muestra</th><th>Stock</th><th>Estado</th></tr>
                 </thead>
                 <tbody>
                     {% for sample in recent_samples %}
                     <tr>
-                        <td><a href="/samples/{{ sample.id }}">{{ sample.code }}</a></td>
-                        <td>{{ sample.origin or sample.country_name or '-' }}</td>
+                        <td>{{ dashboard_sample_cell(sample) }}</td>
                         <td>{{ sample.available_quantity_g or 0 }} g</td>
                         <td><span class="status-badge status-{{ status_class(sample.status) }}">{{ status_label(sample.status) }}</span></td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="4" class="empty">Sin muestras registradas.</td></tr>
+                    <tr><td colspan="3" class="empty">Sin muestras registradas.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -56,17 +64,16 @@
         <div class="table-responsive ops-table-wrap">
             <table class="ops-table">
                 <thead>
-                    <tr><th>Codigo</th><th>Origen</th><th>Stock</th></tr>
+                    <tr><th>Muestra</th><th>Stock</th></tr>
                 </thead>
                 <tbody>
                     {% for sample in pending_tasting_samples %}
                     <tr>
-                        <td><a href="/samples/{{ sample.id }}">{{ sample.code }}</a></td>
-                        <td>{{ sample.origin or sample.country_name or '-' }}</td>
+                        <td>{{ dashboard_sample_cell(sample) }}</td>
                         <td>{{ sample.available_quantity_g or 0 }} g</td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="3" class="empty">Sin pendientes.</td></tr>
+                    <tr><td colspan="2" class="empty">Sin pendientes.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -78,17 +85,16 @@
         <div class="table-responsive ops-table-wrap">
             <table class="ops-table">
                 <thead>
-                    <tr><th>Codigo</th><th>Origen</th><th>Estado</th></tr>
+                    <tr><th>Muestra</th><th>Estado</th></tr>
                 </thead>
                 <tbody>
                     {% for sample in out_of_stock_samples %}
                     <tr>
-                        <td><a href="/samples/{{ sample.id }}">{{ sample.code }}</a></td>
-                        <td>{{ sample.origin or sample.country_name or '-' }}</td>
+                        <td>{{ dashboard_sample_cell(sample) }}</td>
                         <td>{{ status_label(sample.status) }}</td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="3" class="empty">Sin incidencias.</td></tr>
+                    <tr><td colspan="2" class="empty">Sin incidencias.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -105,7 +111,7 @@
                 <tbody>
                     {% for tasting in latest_tastings %}
                     <tr>
-                        <td>{% if tasting.sample %}<a href="/samples/{{ tasting.sample.id }}">{{ tasting.sample.code }}</a>{% else %}-{% endif %}</td>
+                        <td>{% if tasting.sample %}{{ dashboard_sample_cell(tasting.sample) }}{% else %}-{% endif %}</td>
                         <td>{{ tasting.evaluator or '-' }}</td>
                         <td><strong>{{ "%.1f"|format(tasting.indian_score or 0) }}</strong></td>
                         <td>{{ tasting_result_label(tasting.result) }}</td>
@@ -124,7 +130,7 @@
         <div class="card-header"><h3>Muestras por origen</h3></div>
         <div class="compact-list">
             {% for origin, count in origin_counts %}
-            <div class="list-row"><span>{{ origin or 'Sin origen' }}</span><strong>{{ count }}</strong></div>
+            <div class="list-row"><span>{{ display_value(origin, 'Sin origen') }}</span><strong>{{ count }}</strong></div>
             {% else %}
             <p class="empty">Sin datos.</p>
             {% endfor %}
@@ -135,7 +141,7 @@
         <div class="card-header"><h3>Muestras por proveedor</h3></div>
         <div class="compact-list">
             {% for provider, count in provider_counts %}
-            <div class="list-row"><span>{{ provider or 'Sin proveedor' }}</span><strong>{{ count }}</strong></div>
+            <div class="list-row"><span>{{ display_value(provider, 'Sin proveedor') }}</span><strong>{{ count }}</strong></div>
             {% else %}
             <p class="empty">Sin datos.</p>
             {% endfor %}

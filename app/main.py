@@ -128,31 +128,35 @@ def _sample_country_with_flag(sample: Sample) -> str:
     return f"{flag} {country}".strip()
 
 
+def _emoji_flag(country_code: str) -> str:
+    code = display_value(country_code, "").upper()
+    code_aliases = {"ETH": "ET"}
+    code = code_aliases.get(code, code)
+    if len(code) != 2 or not code.isalpha():
+        return ""
+    return "".join(chr(0x1F1E6 + ord(char) - ord("A")) for char in code)
+
+
 def _country_flag_for_value(value) -> str:
     key = _normalize_origin_key(value)
     if not key:
         return ""
     code = str(value or "").strip().upper()
-    flags_by_code = {
-        "BR": "🇧🇷", "CO": "🇨🇴", "HN": "🇭🇳", "CI": "🇨🇮", "SL": "🇸🇱",
-        "UG": "🇺🇬", "VN": "🇻🇳", "PE": "🇵🇪", "MX": "🇲🇽", "GT": "🇬🇹",
-        "CR": "🇨🇷", "SV": "🇸🇻", "NI": "🇳🇮", "ETH": "🇪🇹", "KE": "🇰🇪",
-        "RW": "🇷🇼", "BI": "🇧🇮", "TZ": "🇹🇿", "IN": "🇮🇳", "ID": "🇮🇩",
+    supported_codes = {"BR", "CO", "HN", "CI", "SL", "UG", "VN", "PE", "MX", "GT", "CR", "SV", "NI", "ET", "ETH", "KE", "RW", "BI", "TZ", "IN", "ID"}
+    if code in supported_codes:
+        return _emoji_flag(code)
+    country_codes_by_name = {
+        "brasil": "BR", "brazil": "BR", "colombia": "CO", "honduras": "HN",
+        "costa de marfil": "CI", "cote d ivoire": "CI", "cote divoire": "CI",
+        "ivory coast": "CI", "sierra leona": "SL", "sierra leone": "SL",
+        "uganda": "UG", "vietnam": "VN", "viet nam": "VN", "peru": "PE",
+        "mexico": "MX", "guatemala": "GT", "costa rica": "CR",
+        "el salvador": "SV", "nicaragua": "NI", "etiopia": "ET",
+        "ethiopia": "ET", "kenia": "KE", "kenya": "KE", "ruanda": "RW",
+        "rwanda": "RW", "burundi": "BI", "tanzania": "TZ", "india": "IN",
+        "indonesia": "ID",
     }
-    if code in flags_by_code:
-        return flags_by_code[code]
-    flags_by_name = {
-        "brasil": "🇧🇷", "brazil": "🇧🇷", "colombia": "🇨🇴", "honduras": "🇭🇳",
-        "costa de marfil": "🇨🇮", "cote d ivoire": "🇨🇮", "cote divoire": "🇨🇮",
-        "ivory coast": "🇨🇮", "sierra leona": "🇸🇱", "sierra leone": "🇸🇱",
-        "uganda": "🇺🇬", "vietnam": "🇻🇳", "viet nam": "🇻🇳", "peru": "🇵🇪",
-        "mexico": "🇲🇽", "guatemala": "🇬🇹", "costa rica": "🇨🇷",
-        "el salvador": "🇸🇻", "nicaragua": "🇳🇮", "etiopia": "🇪🇹",
-        "ethiopia": "🇪🇹", "kenia": "🇰🇪", "kenya": "🇰🇪", "ruanda": "🇷🇼",
-        "rwanda": "🇷🇼", "burundi": "🇧🇮", "tanzania": "🇹🇿", "india": "🇮🇳",
-        "indonesia": "🇮🇩",
-    }
-    return flags_by_name.get(key, "")
+    return _emoji_flag(country_codes_by_name.get(key, ""))
 
 
 def _country_flag_for_sample(sample: Sample) -> str:
@@ -196,6 +200,75 @@ def display_value(value, default="-"):
     if not text or text.lower() in {"none", "null", "nan", "-"}:
         return default
     return text
+
+
+def _sample_type_label(value) -> str:
+    badges = _sample_type_badges(value)
+    if not badges:
+        return ""
+    return " / ".join(badge["label"] for badge in badges if badge.get("label"))
+
+
+def _sample_compare_label(sample: Sample) -> str:
+    parts = [
+        display_value(sample.quality, ""),
+        _sample_country_display(sample),
+        _sample_type_label(sample.variety),
+        f"CVC {display_value(sample.purchase_contract_cvc, '')}" if display_value(sample.purchase_contract_cvc, "") else "",
+        display_value(sample.producer, ""),
+    ]
+    return " | ".join(part for part in parts if part)
+
+
+def _sample_compare_header(sample: Sample) -> dict:
+    return {
+        "quality": display_value(sample.quality, "Sin calidad"),
+        "country": _sample_country_with_flag(sample) or display_value(_sample_country_display(sample), ""),
+        "cvc": display_value(sample.purchase_contract_cvc, ""),
+        "code": display_value(sample.code, ""),
+    }
+
+
+def _sample_dashboard_identity(sample: Sample) -> dict:
+    country = _sample_country_with_flag(sample) or _sample_country_display(sample)
+    type_label = _sample_type_label(sample.variety)
+    meta_parts = [
+        display_value(country, ""),
+        type_label,
+        display_value(sample.producer, ""),
+        f"CVC {display_value(sample.purchase_contract_cvc, '')}" if display_value(sample.purchase_contract_cvc, "") else "",
+        f"Ref. {display_value(sample.supplier_reference, '')}" if display_value(sample.supplier_reference, "") else "",
+    ]
+    main = display_value(sample.quality, "")
+    if not main:
+        fallback_parts = [display_value(country, ""), display_value(sample.producer, "")]
+        main = " · ".join(part for part in fallback_parts if part)
+    if not main:
+        main = display_value(sample.code, f"Muestra #{sample.id}")
+    return {
+        "main": main,
+        "meta": " · ".join(part for part in meta_parts if part),
+        "code": display_value(sample.code, ""),
+    }
+
+
+def _normalized_group_counts(rows, empty_label: str) -> list[tuple[str, int]]:
+    counts = {}
+    labels = {}
+    for raw_value, count in rows:
+        label = display_value(raw_value, "")
+        if not label:
+            key = "__empty__"
+            label = empty_label
+        else:
+            label = re.sub(r"\s+", " ", label).strip()
+            key = _normalize_origin_key(label) or "__empty__"
+        labels.setdefault(key, label)
+        counts[key] = counts.get(key, 0) + count
+    return sorted(
+        ((labels[key], count) for key, count in counts.items()),
+        key=lambda item: (-item[1], _normalize_origin_key(item[0])),
+    )
 
 
 def _data_option_label(value) -> str:
@@ -374,6 +447,10 @@ templates.env.globals["sample_country_display"] = _sample_country_display
 templates.env.globals["sample_country_with_flag"] = _sample_country_with_flag
 templates.env.globals["sample_type_badge_class"] = _sample_type_badge_class
 templates.env.globals["sample_type_badges"] = _sample_type_badges
+templates.env.globals["sample_type_label"] = _sample_type_label
+templates.env.globals["sample_compare_label"] = _sample_compare_label
+templates.env.globals["sample_compare_header"] = _sample_compare_header
+templates.env.globals["sample_dashboard_identity"] = _sample_dashboard_identity
 templates.env.globals["display_value"] = display_value
 templates.env.globals["logo_exists"] = logo_exists
 
@@ -539,8 +616,10 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     latest_tastings = db.query(Tasting).order_by(desc(Tasting.tasting_date)).limit(5).all()
     pending_tasting_samples = db.query(Sample).filter(~Sample.tastings.any()).order_by(desc(Sample.created_at)).limit(6).all()
     out_of_stock_samples = db.query(Sample).filter(Sample.available_quantity_g <= 0).order_by(desc(Sample.updated_at)).limit(6).all()
-    origin_counts = db.query(Sample.origin, func.count(Sample.id)).group_by(Sample.origin).order_by(desc(func.count(Sample.id))).limit(6).all()
-    provider_counts = db.query(Sample.producer, func.count(Sample.id)).group_by(Sample.producer).order_by(desc(func.count(Sample.id))).limit(6).all()
+    raw_origin_counts = db.query(Sample.origin, func.count(Sample.id)).group_by(Sample.origin).all()
+    raw_provider_counts = db.query(Sample.producer, func.count(Sample.id)).group_by(Sample.producer).all()
+    origin_counts = _normalized_group_counts(raw_origin_counts, "Sin origen")[:6]
+    provider_counts = _normalized_group_counts(raw_provider_counts, "Sin proveedor")[:6]
     
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
@@ -2093,7 +2172,9 @@ async def compare_samples(
     
     if ids:
         sample_ids = [int(id) for id in ids.split(",")]
-        samples = db.query(Sample).filter(Sample.id.in_(sample_ids)).all()
+        found_samples = db.query(Sample).filter(Sample.id.in_(sample_ids)).all()
+        samples_by_id = {sample.id: sample for sample in found_samples}
+        samples = [samples_by_id[sample_id] for sample_id in sample_ids if sample_id in samples_by_id]
         tastings = {
             s.id: db.query(Tasting).filter(
                 Tasting.sample_id == s.id
@@ -2106,6 +2187,7 @@ async def compare_samples(
         "samples": samples,
         "tastings": tastings,
         "all_samples": db.query(Sample).all(),
+        "selected_sample_ids": {sample.id for sample in samples},
     })
 
 

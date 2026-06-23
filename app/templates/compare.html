@@ -6,8 +6,8 @@
 <div class="page-header">
     <div>
         <span class="eyebrow"><i class="fa-solid fa-scale-balanced"></i> Comparador</span>
-        <h2>Comparación de muestras</h2>
-        <p class="lead">Selecciona los lotes de café verde que quieras evaluar lado a lado y encuentra rápidamente las diferencias clave.</p>
+        <h2>Comparacion de muestras</h2>
+        <p class="lead">Selecciona cafes verdes para comparar su identidad comercial, stock y datos de cata lado a lado.</p>
     </div>
 </div>
 
@@ -21,44 +21,78 @@
                 <label>Selecciona muestras</label>
                 <select id="sample-select" multiple size="8">
                     {% for sample in all_samples %}
-                        <option value="{{ sample.id }}">{{ sample.code }} - {{ sample.country_name }} - {{ sample.origin }}</option>
+                        <option value="{{ sample.id }}" {% if sample.id in selected_sample_ids %}selected{% endif %}>
+                            {{ sample_compare_label(sample) or 'Muestra #' ~ sample.id }}
+                        </option>
                     {% endfor %}
                 </select>
             </div>
             <div class="form-actions" style="margin-top: 1rem;">
-                <button type="button" onclick="updateComparison()" class="btn btn-primary"><i class="fa-solid fa-arrow-right-to-bracket"></i> Comparar</button>
+                <button type="button" onclick="updateComparison()" class="btn btn-primary">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i> Comparar
+                </button>
             </div>
         </form>
     </div>
 </div>
 
+{% macro value_cell(value, suffix='') -%}
+    {%- set clean = display_value(value, '') -%}
+    {%- if clean -%}{{ clean }}{{ suffix }}{%- else -%}<span class="no-data">—</span>{%- endif -%}
+{%- endmacro %}
+
+{% macro tasting_metric(tasting, attr, suffix='') -%}
+    {%- if tasting and tasting[attr] is not none -%}
+        {{ "%.1f"|format(tasting[attr]) }}{{ suffix }}
+    {%- else -%}
+        <span class="no-data">—</span>
+    {%- endif -%}
+{%- endmacro %}
+
 {% if samples %}
-<div class="card" style="margin-top: 1.5rem;">
+<div class="card compare-results-card">
     <div class="card-header">
-        <h3>Resultados de la comparación</h3>
+        <h3>Resultados de la comparacion</h3>
     </div>
     <div class="card-body table-responsive">
-        <table class="table">
+        <table class="table comparison-table">
             <thead>
                 <tr>
-                    <th>Característica</th>
+                    <th>Caracteristica</th>
                     {% for sample in samples %}
-                    <th>{{ sample.code }}</th>
+                    {% set heading = sample_compare_header(sample) %}
+                    <th>
+                        <div class="compare-sample-heading" title="Codigo interno: {{ heading.code or '-' }}">
+                            <strong>{{ heading.quality }}</strong>
+                            {% if heading.country %}<span>{{ heading.country }}</span>{% endif %}
+                            {% if heading.cvc %}<span>CVC {{ heading.cvc }}</span>{% endif %}
+                            {% if heading.code %}<small>{{ heading.code }}</small>{% endif %}
+                        </div>
+                    </th>
                     {% endfor %}
                 </tr>
             </thead>
             <tbody>
-                <tr><td><strong>País</strong></td>{% for sample in samples %}<td>{{ sample.country_name }}</td>{% endfor %}</tr>
-                <tr><td><strong>Origen</strong></td>{% for sample in samples %}<td>{{ sample.origin }}</td>{% endfor %}</tr>
-                <tr><td><strong>Variedad</strong></td>{% for sample in samples %}<td>{{ sample.variety }}</td>{% endfor %}</tr>
-                <tr><td><strong>Disponible</strong></td>{% for sample in samples %}<td>{{ sample.available_quantity_g }} g</td>{% endfor %}</tr>
-                <tr><td><strong>Procesamiento</strong></td>{% for sample in samples %}<td>{{ sample.processing }}</td>{% endfor %}</tr>
+                <tr><td><strong>Calidad</strong></td>{% for sample in samples %}<td>{{ value_cell(sample.quality) }}</td>{% endfor %}</tr>
+                <tr><td><strong>Tipo</strong></td>{% for sample in samples %}<td>{% if sample.variety %}<div class="type-badge-list">{% for badge in sample_type_badges(sample.variety) %}<span class="{{ badge.class }}">{{ badge.label }}</span>{% endfor %}</div>{% else %}<span class="no-data">—</span>{% endif %}</td>{% endfor %}</tr>
+                <tr><td><strong>Pais</strong></td>{% for sample in samples %}<td>{{ sample_country_with_flag(sample) or value_cell(sample_country_display(sample)) }}</td>{% endfor %}</tr>
+                <tr><td><strong>Origen / zona</strong></td>{% for sample in samples %}<td>{{ value_cell(sample.origin) }}</td>{% endfor %}</tr>
+                <tr><td><strong>Proveedor</strong></td>{% for sample in samples %}<td>{{ value_cell(sample.producer) }}</td>{% endfor %}</tr>
+                <tr><td><strong>Referencia proveedor</strong></td>{% for sample in samples %}<td>{{ value_cell(sample.supplier_reference) }}</td>{% endfor %}</tr>
+                <tr><td><strong>CVC</strong></td>{% for sample in samples %}<td>{{ value_cell(sample.purchase_contract_cvc) }}</td>{% endfor %}</tr>
+                <tr><td><strong>Contenedor</strong></td>{% for sample in samples %}<td>{{ value_cell(sample.container_number) }}</td>{% endfor %}</tr>
+                <tr><td><strong>Almacen</strong></td>{% for sample in samples %}<td>{{ value_cell(sample.warehouse) }}</td>{% endfor %}</tr>
+                <tr><td><strong>Cantidad disponible</strong></td>{% for sample in samples %}<td>{% if sample.available_quantity_g is not none %}{{ sample.available_quantity_g }} g{% else %}<span class="no-data">—</span>{% endif %}</td>{% endfor %}</tr>
+                <tr><td><strong>Productor</strong></td>{% for sample in samples %}<td>{{ value_cell(sample.producer) }}</td>{% endfor %}</tr>
+                <tr><td><strong>Altitud</strong></td>{% for sample in samples %}<td>{% if sample.altitude %}{{ sample.altitude }} m.s.n.m.{% else %}<span class="no-data">—</span>{% endif %}</td>{% endfor %}</tr>
+                <tr><td><strong>Proceso</strong></td>{% for sample in samples %}<td>{{ value_cell(sample.processing) }}</td>{% endfor %}</tr>
+                <tr><td><strong>Cosecha</strong></td>{% for sample in samples %}<td>{{ value_cell(sample.harvest_date) }}</td>{% endfor %}</tr>
                 {% if tastings %}
-                <tr class="comparison-scores"><td><strong>Indian Score</strong></td>{% for sample in samples %}<td>{% if tastings[sample.id] %}<span class="score">{{ "%.1f"|format(tastings[sample.id].indian_score) }}</span>{% else %}<span class="no-data">-</span>{% endif %}</td>{% endfor %}</tr>
-                <tr><td><strong>Puntuación de Taza</strong></td>{% for sample in samples %}<td>{% if tastings[sample.id] %}{{ "%.1f"|format(tastings[sample.id].cup_score) }}{% else %}<span class="no-data">-</span>{% endif %}</td>{% endfor %}</tr>
-                <tr><td><strong>Viabilidad Comercial</strong></td>{% for sample in samples %}<td>{% if tastings[sample.id] %}{{ "%.1f"|format(tastings[sample.id].commercial_score) }}{% else %}<span class="no-data">-</span>{% endif %}</td>{% endfor %}</tr>
-                <tr><td><strong>Criba 18+</strong></td>{% for sample in samples %}<td>{% if tastings[sample.id] %}{{ "%.1f"|format(tastings[sample.id].sieve_18) }}%{% else %}<span class="no-data">-</span>{% endif %}</td>{% endfor %}</tr>
-                <tr><td><strong>Humedad</strong></td>{% for sample in samples %}<td>{% if tastings[sample.id] %}{{ "%.1f"|format(tastings[sample.id].humidity) }}%{% else %}<span class="no-data">-</span>{% endif %}</td>{% endfor %}</tr>
+                <tr class="comparison-scores"><td><strong>Indian Score</strong></td>{% for sample in samples %}<td>{{ tasting_metric(tastings[sample.id], 'indian_score') }}</td>{% endfor %}</tr>
+                <tr><td><strong>Puntuacion de taza</strong></td>{% for sample in samples %}<td>{{ tasting_metric(tastings[sample.id], 'cup_score') }}</td>{% endfor %}</tr>
+                <tr><td><strong>Viabilidad comercial</strong></td>{% for sample in samples %}<td>{{ tasting_metric(tastings[sample.id], 'commercial_score') }}</td>{% endfor %}</tr>
+                <tr><td><strong>Criba 18+</strong></td>{% for sample in samples %}<td>{{ tasting_metric(tastings[sample.id], 'sieve_18', '%') }}</td>{% endfor %}</tr>
+                <tr><td><strong>Humedad</strong></td>{% for sample in samples %}<td>{{ tasting_metric(tastings[sample.id], 'humidity', '%') }}</td>{% endfor %}</tr>
                 {% endif %}
             </tbody>
         </table>
