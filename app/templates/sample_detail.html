@@ -6,7 +6,16 @@
 <section class="sample-hero">
     <div class="sample-hero-main">
         <span class="eyebrow"><i class="fa-solid fa-flask-vial"></i> Ficha tecnica</span>
-        <div class="sample-country-title">{{ sample_country_with_flag(sample) or '-' }}</div>
+        {% set country_label = sample_country_display(sample) %}
+        {% set country_flag = sample_country_flag(sample) %}
+        <div class="sample-country-title">
+            {% if country_label %}
+                {% if country_flag %}<span class="country-flag-symbol">{{ country_flag }}</span>{% endif %}
+                <span>{{ country_label }}</span>
+            {% else %}
+                -
+            {% endif %}
+        </div>
         <h2>{{ display_value(sample.quality, 'Sin calidad') }}</h2>
         {% if sample.variety %}<div class="sample-type-line"><span>Tipo</span><div class="type-badge-list">{% for badge in sample_type_badges(sample.variety) %}<span class="{{ badge.class }}">{{ badge.label }}</span>{% endfor %}</div></div>{% endif %}
         <p class="lead">{{ display_value(sample.producer) }} · Ref. {{ display_value(sample.supplier_reference) }}</p>

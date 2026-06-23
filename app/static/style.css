@@ -790,6 +790,22 @@ legend {
     width: 100%;
 }
 
+.country-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.country-flag-symbol {
+    display: inline-block;
+    flex: 0 0 auto;
+    font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+    font-size: 1.05em;
+    line-height: 1;
+}
+
 .sample-meta {
     display: flex;
     flex-wrap: wrap;

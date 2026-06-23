@@ -119,7 +119,15 @@
                             <span class="sample-secondary-code">{{ display_value(sample.code) }}</span>
                         </td>
                         <td>{% if sample.variety %}<div class="type-badge-list">{% for badge in sample_type_badges(sample.variety) %}<span class="{{ badge.class }}">{{ badge.label }}</span>{% endfor %}</div>{% else %}-{% endif %}</td>
-                        <td>{{ sample_country_with_flag(sample) or '-' }}</td>
+                        <td>
+                            {% set country_label = sample_country_display(sample) %}
+                            {% set country_flag = sample_country_flag(sample) %}
+                            {% if country_label %}
+                            <span class="country-display">{% if country_flag %}<span class="country-flag-symbol">{{ country_flag }}</span>{% endif %}<span>{{ country_label }}</span></span>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
                         <td>{{ display_value(sample.supplier_reference) }}</td>
                         <td>{{ display_value(sample.purchase_contract_cvc) }}</td>
                         <td>{{ sample.available_quantity_g or 0 }} g</td>

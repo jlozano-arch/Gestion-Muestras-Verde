@@ -78,6 +78,15 @@ TASTING_RESULT_LABELS = {
     "rejected": "Rechazada",
 }
 
+SAMPLE_STATUS_OPTIONS = [
+    ("received", "Recibida"),
+    ("available", "Disponible"),
+    ("shipped", "Enviada"),
+    ("approved", "Aprobada"),
+    ("rejected", "Rechazada"),
+    ("archived", "Archivada"),
+]
+
 
 def normalize_status_value(status) -> str:
     if status is None:
@@ -126,6 +135,10 @@ def _sample_country_with_flag(sample: Sample) -> str:
         return ""
     flag = _country_flag_for_sample(sample)
     return f"{flag} {country}".strip()
+
+
+def _sample_country_flag(sample: Sample) -> str:
+    return _country_flag_for_sample(sample)
 
 
 def _emoji_flag(country_code: str) -> str:
@@ -265,6 +278,30 @@ def _normalized_group_counts(rows, empty_label: str) -> list[tuple[str, int]]:
             key = _normalize_origin_key(label) or "__empty__"
         labels.setdefault(key, label)
         counts[key] = counts.get(key, 0) + count
+    return sorted(
+        ((labels[key], count) for key, count in counts.items()),
+        key=lambda item: (-item[1], _normalize_origin_key(item[0])),
+    )
+
+
+def _sample_origin_group_label(sample: Sample) -> str:
+    origin = display_value(sample.origin, "")
+    if origin:
+        return origin
+    country = _sample_country_display(sample)
+    if country:
+        return country
+    return "Sin origen"
+
+
+def _sample_origin_group_counts(samples: list[Sample]) -> list[tuple[str, int]]:
+    counts = {}
+    labels = {}
+    for sample in samples:
+        label = _sample_origin_group_label(sample)
+        key = _normalize_origin_key(label) or "__empty__"
+        labels.setdefault(key, label)
+        counts[key] = counts.get(key, 0) + 1
     return sorted(
         ((labels[key], count) for key, count in counts.items()),
         key=lambda item: (-item[1], _normalize_origin_key(item[0])),
@@ -444,6 +481,7 @@ templates.env.globals["status_label"] = status_label
 templates.env.globals["status_class"] = status_class
 templates.env.globals["tasting_result_label"] = tasting_result_label
 templates.env.globals["sample_country_display"] = _sample_country_display
+templates.env.globals["sample_country_flag"] = _sample_country_flag
 templates.env.globals["sample_country_with_flag"] = _sample_country_with_flag
 templates.env.globals["sample_type_badge_class"] = _sample_type_badge_class
 templates.env.globals["sample_type_badges"] = _sample_type_badges
@@ -616,9 +654,9 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     latest_tastings = db.query(Tasting).order_by(desc(Tasting.tasting_date)).limit(5).all()
     pending_tasting_samples = db.query(Sample).filter(~Sample.tastings.any()).order_by(desc(Sample.created_at)).limit(6).all()
     out_of_stock_samples = db.query(Sample).filter(Sample.available_quantity_g <= 0).order_by(desc(Sample.updated_at)).limit(6).all()
-    raw_origin_counts = db.query(Sample.origin, func.count(Sample.id)).group_by(Sample.origin).all()
+    all_samples_for_groups = db.query(Sample).all()
     raw_provider_counts = db.query(Sample.producer, func.count(Sample.id)).group_by(Sample.producer).all()
-    origin_counts = _normalized_group_counts(raw_origin_counts, "Sin origen")[:6]
+    origin_counts = _sample_origin_group_counts(all_samples_for_groups)[:6]
     provider_counts = _normalized_group_counts(raw_provider_counts, "Sin proveedor")[:6]
     
     return templates.TemplateResponse("dashboard.html", {
@@ -786,7 +824,8 @@ async def new_sample_form(request: Request):
         "processing_methods": [
             "Washed/Lavado", "Natural/Secado al sol", "Honey/Miel",
             "Anaerobic", "Fermented"
-        ]
+        ],
+        "status_options": SAMPLE_STATUS_OPTIONS,
     })
 
 
@@ -814,6 +853,7 @@ async def create_sample(
     altitude: int = Form(None),
     processing: str = Form(None),
     physical_location: str = Form(None),
+    status: str = Form(None),
     notes: str = Form(None),
     db: Session = Depends(get_db)
 ):
@@ -863,6 +903,9 @@ async def create_sample(
         available_quantity_g = received_quantity_g
 
     normalized_country_code, normalized_country_name, normalized_origin = _split_country_origin(country_code, origin)
+    normalized_status = normalize_status_value(status) if status else SampleStatus.RECEIVED.value
+    if normalized_status not in {sample_status.value for sample_status in SampleStatus}:
+        raise HTTPException(status_code=400, detail="Estado de muestra no valido")
     sample = Sample(
         code=code,
         country_code=normalized_country_code or country_code,
@@ -889,7 +932,7 @@ async def create_sample(
         received_quantity_g=received_quantity_g,
         available_quantity_g=available_quantity_g,
         notes=notes,
-        status=SampleStatus.RECEIVED,
+        status=normalized_status,
         created_at=created_at
     )
 
@@ -961,7 +1004,8 @@ async def edit_sample_form(sample_id: int, request: Request, db: Session = Depen
         "processing_methods": [
             "Washed/Lavado", "Natural/Secado al sol", "Honey/Miel",
             "Anaerobic", "Fermented"
-        ]
+        ],
+        "status_options": SAMPLE_STATUS_OPTIONS,
     })
 
 
@@ -990,6 +1034,7 @@ async def update_sample(
     altitude: int = Form(None),
     processing: str = Form(None),
     physical_location: str = Form(None),
+    status: str = Form(None),
     notes: str = Form(None),
     db: Session = Depends(get_db)
 ):
@@ -1004,6 +1049,9 @@ async def update_sample(
     existing = db.query(Sample).filter(Sample.code == code, Sample.id != sample_id).first()
     if existing:
         raise HTTPException(status_code=400, detail="El código de muestra ya existe")
+    normalized_status = normalize_status_value(status) if status else ""
+    if normalized_status and normalized_status not in {sample_status.value for sample_status in SampleStatus}:
+        raise HTTPException(status_code=400, detail="Estado de muestra no valido")
 
     try:
         initial_quantity = float(initial_quantity_grams) / 1000.0 if initial_quantity_grams not in (None, '', '0') else 0.0
@@ -1051,6 +1099,8 @@ async def update_sample(
     except (ValueError, TypeError):
         pass
     sample.notes = notes
+    if normalized_status:
+        sample.status = normalized_status
 
     if received_date:
         try:
