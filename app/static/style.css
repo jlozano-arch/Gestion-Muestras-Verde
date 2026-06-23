@@ -571,6 +571,110 @@ body:has(.dashboard-opsbar) .container {
     background: #f4f7f3;
 }
 
+.row-select-cell {
+    width: 2.5rem;
+    text-align: center;
+}
+
+.sample-primary-link {
+    display: block;
+    font-weight: 800;
+    color: var(--text);
+    text-decoration: none;
+    font-size: clamp(1rem, 1.15vw, 1.12rem);
+    line-height: 1.18;
+}
+
+.sample-primary-link:hover {
+    color: var(--primary);
+}
+
+.sample-secondary-code,
+.sample-internal-code {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    line-height: 1.25;
+    margin-top: 0.32rem;
+}
+
+.sample-secondary-code {
+    letter-spacing: 0.02em;
+}
+
+.type-badge-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.type-badge {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    max-width: 100%;
+    min-height: 28px;
+    padding: 0.28rem 0.58rem;
+    border-radius: var(--radius-pill);
+    background: var(--surface-alt);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    font-size: 0.76rem;
+    font-weight: 800;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+}
+
+.type-badge-eco::before,
+.type-badge-decaf::before,
+.type-badge-mixed::before {
+    content: "";
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 2px;
+    margin-right: 0.36rem;
+    flex: 0 0 auto;
+}
+
+.type-badge-eco {
+    background: #E3F4DF;
+    color: #226B2F;
+    border-color: #B6DDB1;
+}
+
+.type-badge-eco::before {
+    background: #4FAD52;
+}
+
+.type-badge-decaf,
+.type-badge-mixed {
+    background: #F6E4CF;
+    color: #7A451B;
+    border-color: #E2BF96;
+}
+
+.type-badge-decaf::before,
+.type-badge-mixed::before {
+    background: #D68536;
+}
+
+.sample-type-line,
+.public-type-line {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin: 0.25rem 0 0.35rem;
+}
+
+.sample-type-line > span:first-child {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
 .form-view,
 .sample-detail-view,
 .compare-view,
@@ -1703,6 +1807,14 @@ legend {
     font-size: clamp(2rem, 4vw, 3rem);
 }
 
+.sample-country-title {
+    color: var(--primary);
+    font-size: clamp(1.1rem, 2vw, 1.45rem);
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
 .sample-hero-meta {
     display: flex;
     flex-wrap: wrap;
@@ -1802,6 +1914,156 @@ legend {
     display: block;
     color: var(--text-muted);
     font-size: 0.86rem;
+}
+
+.public-sample-page {
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.public-mobile-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: var(--shadow-soft);
+    padding: 1.15rem;
+    overflow: hidden;
+}
+
+.public-mobile-header {
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.public-country {
+    color: var(--primary);
+    font-size: clamp(1.15rem, 5vw, 1.7rem);
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+}
+
+.public-mobile-header h2 {
+    margin: 0.35rem 0 0;
+    color: var(--text);
+    font-size: clamp(1.65rem, 8vw, 2.35rem);
+    line-height: 1.05;
+    overflow-wrap: anywhere;
+}
+
+.public-key-data {
+    display: grid;
+    gap: 0.65rem;
+    margin-top: 1rem;
+}
+
+.public-data-row {
+    display: grid;
+    grid-template-columns: minmax(88px, 0.42fr) minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: start;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(16, 34, 70, 0.08);
+}
+
+.public-data-row span,
+.public-notes span,
+.public-internal-code span,
+.public-score-grid span {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.public-data-row strong {
+    min-width: 0;
+    color: var(--text);
+    font-size: 1rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.public-section {
+    margin-top: 1.25rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--border);
+}
+
+.public-section h3 {
+    margin: 0 0 0.8rem;
+    font-size: 1rem;
+}
+
+.public-score-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+}
+
+.public-score-grid div,
+.public-notes {
+    padding: 0.75rem;
+    border-radius: 10px;
+    background: var(--surface-alt);
+}
+
+.public-score-grid strong {
+    display: block;
+    margin-top: 0.15rem;
+    overflow-wrap: anywhere;
+}
+
+.public-notes {
+    margin-top: 0.9rem;
+}
+
+.public-notes p {
+    margin: 0.35rem 0 0;
+    overflow-wrap: anywhere;
+}
+
+.public-documents {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.public-document {
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 0.85rem;
+    align-items: center;
+    min-height: 108px;
+    padding: 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    text-decoration: none;
+}
+
+.public-document img {
+    width: 108px;
+    height: 108px;
+    object-fit: cover;
+    border-radius: 9px;
+}
+
+.public-document span {
+    overflow-wrap: anywhere;
+}
+
+.public-internal-code {
+    margin-top: 1.2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.public-internal-code strong {
+    display: block;
+    margin-top: 0.2rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
 }
 
 .notes-section {
@@ -2102,5 +2364,34 @@ legend {
 @media (max-width: 460px) {
     .dashboard-kpis .stats-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 430px) {
+    .public-sample-page {
+        width: 100%;
+    }
+
+    .public-mobile-card {
+        border-radius: 12px;
+        padding: 0.95rem;
+    }
+
+    .public-data-row {
+        grid-template-columns: 1fr;
+        gap: 0.2rem;
+    }
+
+    .public-score-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .public-document {
+        grid-template-columns: 88px minmax(0, 1fr);
+    }
+
+    .public-document img {
+        width: 88px;
+        height: 88px;
     }
 }

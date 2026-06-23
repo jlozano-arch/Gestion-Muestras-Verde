@@ -99,10 +99,11 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Código</th>
+                        <th></th>
+                        <th>Calidad</th>
+                        <th>Tipo</th>
                         <th>País</th>
-                        <th>Origen</th>
-                        <th>Variedad</th>
+                        <th>Referencia proveedor</th>
                         <th>CVC</th>
                         <th>Disponible</th>
                         <th>Estado</th>
@@ -112,10 +113,14 @@
                 <tbody>
                     {% for sample in samples %}
                     <tr>
-                        <td><input type="checkbox" class="label-check" name="sample_ids" value="{{ sample.id }}"> <a href="/samples/{{ sample.id }}">{{ sample.code }}</a></td>
-                        <td>{{ sample_country_display(sample) or '-' }}</td>
-                        <td>{{ display_value(sample.origin) }}</td>
-                        <td>{{ display_value(sample.variety) }}</td>
+                        <td class="row-select-cell"><input type="checkbox" class="label-check" name="sample_ids" value="{{ sample.id }}"></td>
+                        <td>
+                            <a href="/samples/{{ sample.id }}" class="sample-primary-link">{{ display_value(sample.quality, 'Sin calidad') }}</a>
+                            <span class="sample-secondary-code">{{ display_value(sample.code) }}</span>
+                        </td>
+                        <td>{% if sample.variety %}<div class="type-badge-list">{% for badge in sample_type_badges(sample.variety) %}<span class="{{ badge.class }}">{{ badge.label }}</span>{% endfor %}</div>{% else %}-{% endif %}</td>
+                        <td>{{ sample_country_with_flag(sample) or '-' }}</td>
+                        <td>{{ display_value(sample.supplier_reference) }}</td>
                         <td>{{ display_value(sample.purchase_contract_cvc) }}</td>
                         <td>{{ sample.available_quantity_g or 0 }} g</td>
                         <td><span class="status-badge status-{{ status_class(sample.status) }}">{{ status_label(sample.status) }}</span></td>
@@ -159,3 +164,6 @@ document.getElementById('samples-bulk-delete-form')?.addEventListener('submit', 
 });
 </script>
 {% endblock %}
+
+
+

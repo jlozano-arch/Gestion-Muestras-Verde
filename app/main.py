@@ -120,6 +120,44 @@ def _sample_country_display(sample: Sample) -> str:
     return ""
 
 
+def _sample_country_with_flag(sample: Sample) -> str:
+    country = _sample_country_display(sample)
+    if not country:
+        return ""
+    flag = ""
+    if sample.country_code and sample.country_code in get_all_countries():
+        candidate = get_country_flag(sample.country_code)
+        if candidate and candidate != get_country_flag(""):
+            flag = candidate
+    return f"{flag} {country}".strip()
+
+
+def _sample_type_badge_class(value) -> str:
+    eco, decaf = _quality_style_flags(value)
+    if eco and decaf:
+        return "type-badge type-badge-mixed"
+    if decaf:
+        return "type-badge type-badge-decaf"
+    if eco:
+        return "type-badge type-badge-eco"
+    return "type-badge"
+
+
+def _sample_type_badges(value) -> list[dict]:
+    text = display_value(value, "")
+    if not text:
+        return []
+    eco, decaf = _quality_style_flags(text)
+    badges = []
+    if eco:
+        badges.append({"label": "ECO", "class": "type-badge type-badge-eco"})
+    if decaf:
+        badges.append({"label": "DECAF", "class": "type-badge type-badge-decaf"})
+    if badges:
+        return badges
+    return [{"label": text, "class": "type-badge"}]
+
+
 def display_value(value, default="-"):
     if value is None:
         return default
@@ -297,6 +335,9 @@ templates.env.globals["status_label"] = status_label
 templates.env.globals["status_class"] = status_class
 templates.env.globals["tasting_result_label"] = tasting_result_label
 templates.env.globals["sample_country_display"] = _sample_country_display
+templates.env.globals["sample_country_with_flag"] = _sample_country_with_flag
+templates.env.globals["sample_type_badge_class"] = _sample_type_badge_class
+templates.env.globals["sample_type_badges"] = _sample_type_badges
 templates.env.globals["display_value"] = display_value
 templates.env.globals["logo_exists"] = logo_exists
 
@@ -506,15 +547,25 @@ async def public_sample_detail(sample_id: int, request: Request, db: Session = D
         if not url:
             continue
         file_name = (doc.file_name or "").lower()
+        file_type = (doc.file_type or "").lower()
         is_image = bool(
             (doc.file_type and doc.file_type.startswith("image"))
             or file_name.endswith((".png", ".jpg", ".jpeg", ".webp"))
         )
+        image_key = f"{file_name} {file_type}"
+        if any(token in image_key for token in ["verde", "green"]):
+            photo_order = 0
+        elif any(token in image_key for token in ["tostado", "roasted", "tueste"]):
+            photo_order = 1
+        else:
+            photo_order = 2
         public_documents.append({
             "doc": doc,
             "url": url,
             "is_image": is_image,
+            "photo_order": photo_order,
         })
+    public_documents.sort(key=lambda item: (0 if item["is_image"] else 1, item["photo_order"], item["doc"].upload_date or datetime.min))
 
     return templates.TemplateResponse("public_sample.html", {
         "request": request,
@@ -1616,7 +1667,7 @@ def _normalize_origin_key(origin) -> str:
 def _quality_style_flags(quality) -> tuple[bool, bool]:
     key = _normalize_origin_key(quality)
     tokens = set(key.split())
-    eco = bool(tokens.intersection({"eco", "ecologico", "organico", "organic", "bio"}))
+    eco = bool(tokens.intersection({"eco", "ecologico", "organico", "organic", "bio"})) or any(marker in key for marker in ["ecol", "organ", "bio"])
     decaf = any(marker in key for marker in ["descafeinado", "decaf", "decaff", "decaffeinated", "desca"])
     return eco, decaf
 
@@ -1746,8 +1797,8 @@ def _draw_avery_l7108rev_label(c, sample: Sample, x: float, y: float, qr_data: s
     text_x = x + padding
     max_text_width = width - qr_size - padding * 3
     label_cvc = sample.purchase_contract_cvc
-    line_gap = 5.2 * mm
-    text_lines = 4 + (1 if label_cvc else 0)
+    line_gap = 4.65 * mm
+    text_lines = 3 + (1 if sample.variety else 0) + (1 if label_cvc else 0)
     text_block_height = text_lines * line_gap
     text_y = qr_y + (qr_size + text_block_height) / 2 - 3.5 * mm
 
@@ -1761,9 +1812,12 @@ def _draw_avery_l7108rev_label(c, sample: Sample, x: float, y: float, qr_data: s
         c.drawString(text_x, text_y, text)
         text_y -= line_gap
 
-    def draw_quality_line(value):
+    def draw_quality_line(value, type_value=None):
         nonlocal text_y
-        eco, decaf = _quality_style_flags(value)
+        quality_eco, quality_decaf = _quality_style_flags(value)
+        type_eco, type_decaf = _quality_style_flags(type_value)
+        eco = quality_eco or type_eco
+        decaf = quality_decaf or type_decaf
         text = f"Calidad: {value or '-'}"
         if len(text) > 42:
             text = text[:39] + "..."
@@ -1789,12 +1843,36 @@ def _draw_avery_l7108rev_label(c, sample: Sample, x: float, y: float, qr_data: s
             c.drawString(text_x, text_y, text)
         text_y -= line_gap
 
+    def draw_type_line(value):
+        nonlocal text_y
+        badges = _sample_type_badges(value)
+        if not badges:
+            return
+        c.setFont("Helvetica-Bold", 6.6)
+        c.setFillColor(HexColor("#5F7085"))
+        c.drawString(text_x, text_y, "Tipo:")
+        badge_x = text_x + 9 * mm
+        for badge in badges:
+            label = badge["label"]
+            is_decaf = "decaf" in badge["class"]
+            is_eco = "eco" in badge["class"]
+            bg = "#F4DFC8" if is_decaf else "#DDEEDB" if is_eco else "#F7FBFD"
+            fg = "#5B351E" if is_decaf else "#244D2E" if is_eco else "#111827"
+            badge_w = max(10 * mm, min(18 * mm, (len(label) * 1.8 + 6) * mm))
+            c.setFillColor(HexColor(bg))
+            c.roundRect(badge_x, text_y - 2.2 * mm, badge_w, 4.2 * mm, 1.1 * mm, stroke=0, fill=1)
+            c.setFillColor(HexColor(fg))
+            c.setFont("Helvetica-Bold", 6.2)
+            c.drawCentredString(badge_x + badge_w / 2, text_y - 0.45 * mm, label[:14])
+            badge_x += badge_w + 1.5 * mm
+        text_y -= line_gap
+
     c.setFont("Helvetica-Bold", 9)
     c.setFillColor(HexColor("#153F2B"))
     c.drawString(text_x, text_y, "Indian Ecotrade")
     text_y -= line_gap
-    draw_quality_line(sample.quality)
-    draw_line("Proveedor", sample.producer)
+    draw_quality_line(sample.quality, sample.variety)
+    draw_type_line(sample.variety)
     draw_line("Ref. proveedor", sample.supplier_reference)
     if label_cvc:
         draw_line("CVC", label_cvc)

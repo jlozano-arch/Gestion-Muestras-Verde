@@ -6,10 +6,16 @@
 <section class="sample-hero">
     <div class="sample-hero-main">
         <span class="eyebrow"><i class="fa-solid fa-flask-vial"></i> Ficha tecnica</span>
-        <h2>{{ sample.code }}</h2>
-        <p class="lead">{{ sample_country_display(sample) or '-' }}{% if sample.origin %}, {{ sample.origin }}{% endif %} - {{ sample.producer or '-' }}</p>
+        <div class="sample-country-title">{{ sample_country_with_flag(sample) or '-' }}</div>
+        <h2>{{ display_value(sample.quality, 'Sin calidad') }}</h2>
+        {% if sample.variety %}<div class="sample-type-line"><span>Tipo</span><div class="type-badge-list">{% for badge in sample_type_badges(sample.variety) %}<span class="{{ badge.class }}">{{ badge.label }}</span>{% endfor %}</div></div>{% endif %}
+        <p class="lead">{{ display_value(sample.producer) }} · Ref. {{ display_value(sample.supplier_reference) }}</p>
         <div class="sample-hero-meta">
             <span class="status-badge status-{{ status_class(sample.status) }}">{{ status_label(sample.status) }}</span>
+            <span><i class="fa-solid fa-barcode"></i> Ref. proveedor {{ display_value(sample.supplier_reference) }}</span>
+            {% if sample.purchase_contract_cvc %}<span><i class="fa-solid fa-file-signature"></i> CVC {{ sample.purchase_contract_cvc }}</span>{% endif %}
+            {% if sample.sales_contract_cvv %}<span><i class="fa-solid fa-weight-hanging"></i> Cantidad contrato {{ sample.sales_contract_cvv }}</span>{% endif %}
+            <span class="sample-internal-code"><i class="fa-solid fa-hashtag"></i> Código interno: {{ display_value(sample.code) }}</span>
             <span><i class="fa-solid fa-boxes-stacked"></i> {{ sample.available_quantity_g or 0 }} / {{ sample.received_quantity_g or 0 }} g</span>
             {% if sample.container_number %}<span><i class="fa-solid fa-box"></i> Contenedor {{ sample.container_number }}</span>{% endif %}
         </div>
@@ -330,3 +336,4 @@ function showShipmentForm() {
 }
 </script>
 {% endblock %}
+
