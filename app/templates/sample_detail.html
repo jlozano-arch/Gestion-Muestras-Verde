@@ -30,6 +30,7 @@
         </div>
     </div>
     <div class="page-actions">
+        <a href="/samples/{{ sample.id }}/pdf" class="btn btn-primary" target="_blank"><i class="fa-solid fa-file-pdf"></i> Ficha PDF</a>
         <a href="/samples/{{ sample.id }}/label" class="btn btn-secondary" target="_blank"><i class="fa-solid fa-file-pdf"></i> Etiqueta PDF</a>
         <a href="/samples/{{ sample.id }}/edit" class="btn btn-secondary"><i class="fa-solid fa-pen-to-square"></i> Editar muestra</a>
         <form method="post" action="/samples/{{ sample.id }}/delete" onsubmit="return confirm('Esta accion eliminara la muestra y sus catas, documentos, fotos, envios y eventos. ¿Continuar?');">

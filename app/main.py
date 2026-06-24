@@ -620,43 +620,42 @@ async def startup_event():
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request, db: Session = Depends(get_db)):
     """Dashboard principal"""
-    total_samples = db.query(Sample).count()
-    received_samples = db.query(Sample).filter(
-        Sample.status == SampleStatus.RECEIVED
-    ).count()
-    available_samples = db.query(Sample).filter(
-        Sample.status == SampleStatus.AVAILABLE
-    ).count()
-    approved_samples = db.query(Sample).filter(
-        Sample.status == SampleStatus.APPROVED
-    ).count()
-    rejected_samples = db.query(Sample).filter(
-        Sample.status == SampleStatus.REJECTED
-    ).count()
-    shipped_samples = db.query(Sample).filter(
-        Sample.status == SampleStatus.SHIPPED
-    ).count()
-    archived_samples = db.query(Sample).filter(
-        Sample.status == SampleStatus.ARCHIVED
-    ).count()
-    out_of_stock = db.query(Sample).filter(
-        Sample.available_quantity_g <= 0
-    ).count()
-    # total_quantity in grams using available_quantity_g
-    total_quantity = db.query(Sample).filter(
-        Sample.available_quantity_g > 0
-    ).with_entities(func.sum(Sample.available_quantity_g)).scalar() or 0
-    
-    recent_samples = db.query(Sample).order_by(desc(Sample.created_at)).limit(6).all()
+    all_samples = db.query(Sample).all()
+
+    def status_count(status: SampleStatus) -> int:
+        return sum(1 for sample in all_samples if normalize_status_value(sample.status) == status.value)
+
+    total_samples = len(all_samples)
+    received_samples = status_count(SampleStatus.RECEIVED)
+    available_samples = status_count(SampleStatus.AVAILABLE)
+    approved_samples = status_count(SampleStatus.APPROVED)
+    rejected_samples = status_count(SampleStatus.REJECTED)
+    shipped_samples = status_count(SampleStatus.SHIPPED)
+    archived_samples = status_count(SampleStatus.ARCHIVED)
+    out_of_stock = sum(1 for sample in all_samples if (sample.available_quantity_g or 0) <= 0)
+    total_quantity = sum(max(sample.available_quantity_g or 0, 0) for sample in all_samples)
+
+    recent_samples = sorted(
+        all_samples,
+        key=lambda sample: (sample.created_at or datetime.min, sample.id or 0),
+        reverse=True,
+    )[:6]
     high_score_samples = db.query(Sample).join(Tasting).order_by(
         desc(Tasting.indian_score)
     ).limit(5).all()
-    latest_tastings = db.query(Tasting).order_by(desc(Tasting.tasting_date)).limit(5).all()
-    pending_tasting_samples = db.query(Sample).filter(~Sample.tastings.any()).order_by(desc(Sample.created_at)).limit(6).all()
-    out_of_stock_samples = db.query(Sample).filter(Sample.available_quantity_g <= 0).order_by(desc(Sample.updated_at)).limit(6).all()
-    all_samples_for_groups = db.query(Sample).all()
+    latest_tastings = db.query(Tasting).order_by(desc(Tasting.tasting_date), desc(Tasting.created_at)).limit(5).all()
+    pending_tasting_samples = sorted(
+        [sample for sample in all_samples if not sample.tastings],
+        key=lambda sample: (sample.created_at or datetime.min, sample.id or 0),
+        reverse=True,
+    )[:6]
+    out_of_stock_samples = sorted(
+        [sample for sample in all_samples if (sample.available_quantity_g or 0) <= 0],
+        key=lambda sample: (sample.updated_at or sample.created_at or datetime.min, sample.id or 0),
+        reverse=True,
+    )[:6]
     raw_provider_counts = db.query(Sample.producer, func.count(Sample.id)).group_by(Sample.producer).all()
-    origin_counts = _sample_origin_group_counts(all_samples_for_groups)[:6]
+    origin_counts = _sample_origin_group_counts(all_samples)[:6]
     provider_counts = _normalized_group_counts(raw_provider_counts, "Sin proveedor")[:6]
     
     return templates.TemplateResponse("dashboard.html", {
@@ -1183,8 +1182,8 @@ async def upload_tasting_document(sample_id: int, tasting_id: int, file: UploadF
     return RedirectResponse(f"/samples/{sample_id}", status_code=303)
 
 
-def _pdf_value(value, default="-"):
-    return default if value in (None, "") else str(value)
+def _pdf_value(value, default="—"):
+    return display_value(value, default)
 
 
 def _wrap_text(text, max_chars=78):
@@ -1395,6 +1394,214 @@ async def tasting_pdf(sample_id: int, tasting_id: int, request: Request, db: Ses
 
     pdf_buffer = _render_tasting_pdf_premium(sample, tasting, docs, sample_docs)
     headers = {"Content-Disposition": f"attachment; filename=\"ficha_cata_{sample.code}_{tasting_id}.pdf\""}
+    return StreamingResponse(pdf_buffer, media_type="application/pdf", headers=headers)
+
+
+def _is_image_document(doc: Document) -> bool:
+    file_type = (doc.file_type or "").lower()
+    suffix = Path(doc.file_name or doc.file_path or "").suffix.lower()
+    return file_type.startswith("image") or suffix in {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+
+
+def _document_photo_order(doc: Document) -> int:
+    text = f"{doc.file_name or ''} {doc.file_type or ''}".lower()
+    if any(token in text for token in ("verde", "green")):
+        return 0
+    if any(token in text for token in ("tostado", "roasted", "tueste")):
+        return 1
+    return 2
+
+
+def _draw_sample_pdf_header(c, sample: Sample, width, height, margin, request: Request):
+    primary = "#153F2B"
+    gold = "#D9B45E"
+    c.setFillColor(HexColor(primary))
+    c.rect(0, height - 36 * mm, width, 36 * mm, stroke=0, fill=1)
+    c.setFillColor(HexColor(gold))
+    c.rect(0, height - 38 * mm, width, 2 * mm, stroke=0, fill=1)
+    try:
+        logo_path = Path(__file__).parent / "static" / "logo.png"
+        if logo_path.exists():
+            c.drawImage(ImageReader(str(logo_path)), margin, height - 28 * mm, width=42 * mm, height=17 * mm, preserveAspectRatio=True, mask='auto')
+    except Exception:
+        pass
+    c.setFillColor(HexColor("#FFFFFF"))
+    c.setFont("Helvetica-Bold", 17)
+    c.drawRightString(width - margin, height - 16 * mm, "Ficha completa de muestra")
+    c.setFont("Helvetica", 9)
+    c.drawRightString(width - margin, height - 23 * mm, _public_sample_url(request, sample.id))
+
+    qr_buffer = io.BytesIO()
+    qr = qrcode.QRCode(version=1, box_size=4, border=1)
+    qr.add_data(_public_sample_url(request, sample.id))
+    qr.make(fit=True)
+    qr.make_image(fill_color="black", back_color="white").save(qr_buffer, format="PNG")
+    qr_buffer.seek(0)
+    c.drawImage(ImageReader(qr_buffer), width - margin - 22 * mm, height - 35 * mm, width=18 * mm, height=18 * mm, preserveAspectRatio=True, mask='auto')
+
+
+def _ensure_pdf_space(c, y, needed, width, height, margin, sample, request):
+    if y - needed >= margin + 10 * mm:
+        return y
+    c.showPage()
+    _draw_sample_pdf_header(c, sample, width, height, margin, request)
+    return height - 48 * mm
+
+
+def _draw_pdf_line_list(c, x, y, title, lines, width, sample, request, page_width, page_height, margin):
+    y = _ensure_pdf_space(c, y, 20 * mm, page_width, page_height, margin, sample, request)
+    _draw_section_title(c, x, y, title)
+    y -= 8 * mm
+    c.setFont("Helvetica", 8)
+    c.setFillColor(HexColor("#111827"))
+    for line in lines:
+        y = _ensure_pdf_space(c, y, 6 * mm, page_width, page_height, margin, sample, request)
+        for wrapped in _wrap_text(line, 110)[:3]:
+            c.drawString(x, y, wrapped)
+            y -= 4.2 * mm
+    return y
+
+
+def _render_sample_pdf(sample: Sample, tastings, documents, request: Request) -> io.BytesIO:
+    pdf_buffer = io.BytesIO()
+    c = canvas.Canvas(pdf_buffer, pagesize=A4)
+    width, height = A4
+    margin = 13 * mm
+
+    _draw_sample_pdf_header(c, sample, width, height, margin, request)
+    y = height - 48 * mm
+
+    c.setFillColor(HexColor("#153F2B"))
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(margin, y, _pdf_value(sample.quality, "Sin calidad"))
+    c.setFont("Helvetica", 9)
+    c.setFillColor(HexColor("#65756B"))
+    subtitle = " · ".join(part for part in [
+        _sample_country_with_flag(sample) or _sample_country_display(sample),
+        _sample_type_label(sample.variety),
+        status_label(sample.status),
+    ] if part)
+    c.drawString(margin, y - 6 * mm, subtitle or "—")
+
+    y -= 17 * mm
+    _draw_section_title(c, margin, y, "Identificacion comercial")
+    y -= 9 * mm
+    commercial_fields = [
+        ("Proveedor", sample.producer),
+        ("Ref. proveedor", sample.supplier_reference),
+        ("CVC", sample.purchase_contract_cvc),
+        ("Contenedor", sample.container_number),
+        ("Almacen", sample.warehouse),
+        ("Disponible", f"{sample.available_quantity_g or 0} g"),
+        ("Cantidad contrato", sample.sales_contract_cvv),
+        ("Codigo interno", sample.code),
+    ]
+    y = _draw_field_grid(c, margin, y, commercial_fields, (width - margin * 2) / 2)
+
+    y -= 7 * mm
+    y = _ensure_pdf_space(c, y, 45 * mm, width, height, margin, sample, request)
+    _draw_section_title(c, margin, y, "Datos de origen y perfil")
+    y -= 9 * mm
+    origin_fields = [
+        ("Pais", _sample_country_display(sample)),
+        ("Origen / zona", sample.origin),
+        ("Productor", sample.producer),
+        ("Altitud", f"{sample.altitude} m.s.n.m." if sample.altitude else None),
+        ("Tipo / variedad", sample.variety),
+        ("Proceso", sample.processing),
+        ("Cosecha", sample.harvest_date),
+        ("Categoria", sample.category),
+    ]
+    y = _draw_field_grid(c, margin, y, origin_fields, (width - margin * 2) / 2)
+
+    if sample.notes:
+        y -= 6 * mm
+        y = _ensure_pdf_space(c, y, 24 * mm, width, height, margin, sample, request)
+        y = _draw_notes_box(c, margin, y, width - margin * 2, "Notas generales", sample.notes, max_lines=4)
+
+    y -= 7 * mm
+    y = _ensure_pdf_space(c, y, 38 * mm, width, height, margin, sample, request)
+    _draw_section_title(c, margin, y, "Catas")
+    y -= 9 * mm
+    if tastings:
+        latest = tastings[0]
+        c.setFillColor(HexColor("#F7FAF8"))
+        c.roundRect(margin, y - 26 * mm, width - margin * 2, 24 * mm, 2.5 * mm, stroke=1, fill=1)
+        latest_fields = [
+            ("Ultima cata", latest.tasting_date.strftime("%d/%m/%Y") if latest.tasting_date else None),
+            ("Resultado", tasting_result_label(latest.result)),
+            ("Indian", f"{latest.indian_score:.1f}" if latest.indian_score is not None else None),
+            ("Taza", f"{latest.cup_score:.1f}" if latest.cup_score is not None else None),
+        ]
+        _draw_field_grid(c, margin + 3 * mm, y - 3 * mm, latest_fields, (width - margin * 2 - 6 * mm) / 4, row_height=12 * mm, cols=4)
+        y -= 31 * mm
+        for tasting in tastings:
+            y = _ensure_pdf_space(c, y, 26 * mm, width, height, margin, sample, request)
+            date_text = tasting.tasting_date.strftime("%d/%m/%Y") if tasting.tasting_date else "—"
+            line = f"{date_text} | {tasting_result_label(tasting.result)} | Indian {_pdf_value(f'{tasting.indian_score:.1f}' if tasting.indian_score is not None else None)} | Taza {_pdf_value(f'{tasting.cup_score:.1f}' if tasting.cup_score is not None else None)}"
+            c.setFillColor(HexColor("#153F2B"))
+            c.setFont("Helvetica-Bold", 8.5)
+            c.drawString(margin, y, line)
+            y -= 5 * mm
+            sensory = [
+                ("Aroma", tasting.aroma), ("Acidez", tasting.acidity), ("Cuerpo", tasting.body),
+                ("Sabor", tasting.flavor), ("Regusto", tasting.aftertaste), ("Balance", tasting.balance),
+            ]
+            y = _draw_field_grid(c, margin, y, sensory, (width - margin * 2) / 6, row_height=9 * mm, cols=6)
+            if tasting.tasting_notes:
+                y -= 4 * mm
+                y = _draw_notes_box(c, margin, y, width - margin * 2, "Notas de cata", tasting.tasting_notes, max_lines=3)
+            y -= 5 * mm
+    else:
+        c.setFillColor(HexColor("#65756B"))
+        c.setFont("Helvetica", 9)
+        c.drawString(margin, y, "Sin catas registradas.")
+        y -= 8 * mm
+
+    image_docs = sorted([doc for doc in documents if _is_image_document(doc)], key=_document_photo_order)
+    file_docs = [doc for doc in documents if not _is_image_document(doc)]
+    y -= 4 * mm
+    y = _ensure_pdf_space(c, y, 58 * mm, width, height, margin, sample, request)
+    _draw_section_title(c, margin, y, "Fotografias")
+    y -= 55 * mm
+    if image_docs:
+        photo_width = (width - margin * 2 - 8 * mm) / 2
+        for index, doc in enumerate(image_docs[:4]):
+            if index and index % 2 == 0:
+                y -= 55 * mm
+                y = _ensure_pdf_space(c, y + 55 * mm, 58 * mm, width, height, margin, sample, request) - 55 * mm
+            x = margin + (index % 2) * (photo_width + 8 * mm)
+            title = doc.file_name or f"Fotografia {index + 1}"
+            _draw_photo_slot(c, doc, x, y, photo_width, 48 * mm, title[:48])
+    else:
+        c.setFillColor(HexColor("#65756B"))
+        c.setFont("Helvetica", 9)
+        c.drawString(margin, y + 40 * mm, "Sin fotografias asociadas.")
+
+    y -= 10 * mm
+    doc_lines = [f"{doc.file_name or 'Documento'} | {doc.file_type or 'tipo no indicado'}" for doc in file_docs]
+    if not doc_lines:
+        doc_lines = ["Sin documentos no fotograficos asociados."]
+    y = _draw_pdf_line_list(c, margin, y, "Documentos", doc_lines, width - margin * 2, sample, request, width, height, margin)
+
+    c.setFillColor(HexColor("#65756B"))
+    c.setFont("Helvetica", 7)
+    c.drawCentredString(width / 2, 7 * mm, "Indian Ecotrade | Ficha completa de muestra | QR publico incluido")
+    c.save()
+    pdf_buffer.seek(0)
+    return pdf_buffer
+
+
+@app.get("/samples/{sample_id}/pdf")
+async def sample_pdf(sample_id: int, request: Request, db: Session = Depends(get_db)):
+    sample = db.query(Sample).filter(Sample.id == sample_id).first()
+    if not sample:
+        raise HTTPException(status_code=404, detail="Muestra no encontrada")
+    tastings = db.query(Tasting).filter(Tasting.sample_id == sample_id).order_by(desc(Tasting.tasting_date), desc(Tasting.created_at)).all()
+    documents = db.query(Document).filter(Document.sample_id == sample_id).order_by(desc(Document.upload_date)).all()
+    pdf_buffer = _render_sample_pdf(sample, tastings, documents, request)
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", sample.code or str(sample.id)).strip("_") or str(sample.id)
+    headers = {"Content-Disposition": f"attachment; filename=\"ficha_muestra_{safe_name}.pdf\""}
     return StreamingResponse(pdf_buffer, media_type="application/pdf", headers=headers)
 
     pdf_buffer = io.BytesIO()
@@ -1758,10 +1965,11 @@ async def create_shipment(
     if not sample:
         raise HTTPException(status_code=404, detail="Muestra no encontrada")
     
-    if quantity_g > sample.available_quantity_g:
+    available_g = sample.available_quantity_g or 0
+    if quantity_g > available_g:
         raise HTTPException(
             status_code=400,
-            detail=f"Cantidad solicitada ({quantity_g} g) mayor que disponible ({sample.available_quantity_g} g)"
+            detail=f"Cantidad solicitada ({quantity_g} g) mayor que disponible ({available_g} g)"
         )
     
     # Create shipment
@@ -1776,13 +1984,13 @@ async def create_shipment(
     )
     
     # Reduce available quantity (grams and kg)
-    sample.available_quantity_g -= quantity_g
-    sample.available_quantity -= (quantity_g / 1000.0)
+    sample.available_quantity_g = max(available_g - quantity_g, 0)
+    sample.available_quantity = max((sample.available_quantity or 0) - (quantity_g / 1000.0), 0)
     
     # Update status
-    if sample.available_quantity <= 0:
+    if sample.available_quantity_g <= 0:
         sample.status = SampleStatus.SHIPPED
-    elif sample.available_quantity < sample.initial_quantity:
+    elif sample.available_quantity_g < (sample.received_quantity_g or 0):
         sample.status = SampleStatus.AVAILABLE
     
     # Create event
@@ -1804,20 +2012,45 @@ async def create_shipment(
 # PDF LABELS WITH QR
 # ============================================================================
 
-AVERY_L7108REV = {
-    "page_width_mm": 210,
-    "page_height_mm": 297,
-    "cell_width": 62 * mm,
-    "cell_height": 89 * mm,
-    "label_width": 89 * mm,
-    "label_height": 62 * mm,
-    "columns": 3,
-    "rows": 3,
-    "margin_x": 12 * mm,
-    "margin_y": 15 * mm,
-    "gap_x": 0,
-    "gap_y": 0,
-}
+# Avery L7108REV calibration.
+# Medidas reales verificadas sobre hoja fisica A4 el 2026-06-24.
+PAGE_WIDTH_MM = 210
+PAGE_HEIGHT_MM = 297
+LEFT_MARGIN_MM = 7
+RIGHT_MARGIN_MM = 7
+TOP_MARGIN_MM = 10
+BOTTOM_MARGIN_MM = 10
+H_GAP_MM = 5
+V_GAP_MM = 5
+LABEL_COLUMNS = 3
+LABEL_ROWS = 3
+LABEL_WIDTH_MM = (PAGE_WIDTH_MM - LEFT_MARGIN_MM - RIGHT_MARGIN_MM - (LABEL_COLUMNS - 1) * H_GAP_MM) / LABEL_COLUMNS
+LABEL_HEIGHT_MM = (PAGE_HEIGHT_MM - TOP_MARGIN_MM - BOTTOM_MARGIN_MM - (LABEL_ROWS - 1) * V_GAP_MM) / LABEL_ROWS
+INTERNAL_LABEL_WIDTH_MM = LABEL_HEIGHT_MM
+INTERNAL_LABEL_HEIGHT_MM = LABEL_WIDTH_MM
+DEBUG_LABEL_LAYOUT = os.getenv("DEBUG_LABEL_LAYOUT", "false").lower() == "true"
+
+
+def _build_avery_l7108rev_layout():
+    return {
+        "page_width_mm": PAGE_WIDTH_MM,
+        "page_height_mm": PAGE_HEIGHT_MM,
+        "cell_width": LABEL_WIDTH_MM * mm,
+        "cell_height": LABEL_HEIGHT_MM * mm,
+        "label_width": INTERNAL_LABEL_WIDTH_MM * mm,
+        "label_height": INTERNAL_LABEL_HEIGHT_MM * mm,
+        "columns": LABEL_COLUMNS,
+        "rows": LABEL_ROWS,
+        "margin_left": LEFT_MARGIN_MM * mm,
+        "margin_right": RIGHT_MARGIN_MM * mm,
+        "margin_top": TOP_MARGIN_MM * mm,
+        "margin_bottom": BOTTOM_MARGIN_MM * mm,
+        "gap_x": H_GAP_MM * mm,
+        "gap_y": V_GAP_MM * mm,
+    }
+
+
+AVERY_L7108REV = _build_avery_l7108rev_layout()
 
 
 def _country_header(sample: Sample) -> str:
@@ -2048,6 +2281,35 @@ def _draw_avery_l7108rev_label(c, sample: Sample, x: float, y: float, qr_data: s
     c.restoreState()
 
 
+def _avery_l7108rev_slots(layout, page_height):
+    slots = []
+    for row in range(layout["rows"]):
+        for col in range(layout["columns"]):
+            x = layout["margin_left"] + col * (layout["cell_width"] + layout["gap_x"])
+            y = page_height - layout["margin_top"] - layout["cell_height"] - row * (layout["cell_height"] + layout["gap_y"])
+            slots.append({"x": x, "y": y, "row": row + 1, "col": col + 1, "position": len(slots) + 1})
+    return slots
+
+
+def _draw_avery_debug_guides(c, slot, layout):
+    c.saveState()
+    c.setStrokeColor(HexColor("#D91E18"))
+    c.setLineWidth(0.35)
+    c.rect(slot["x"], slot["y"], layout["cell_width"], layout["cell_height"], stroke=1, fill=0)
+    c.setFillColor(HexColor("#D91E18"))
+    c.setFont("Helvetica-Bold", 6)
+    c.drawString(slot["x"] + 2 * mm, slot["y"] + layout["cell_height"] - 4 * mm, f"Pos {slot['position']}")
+    c.setFont("Helvetica", 5.5)
+    c.drawString(slot["x"] + 2 * mm, slot["y"] + layout["cell_height"] - 7.2 * mm, f"F{slot['row']} C{slot['col']}")
+    c.drawString(slot["x"] + 2 * mm, slot["y"] + 3 * mm, f"x={slot['x'] / mm:.1f} y={slot['y'] / mm:.1f} mm")
+    c.restoreState()
+
+
+def _draw_avery_debug_page(c, slots, layout):
+    for slot in slots:
+        _draw_avery_debug_guides(c, slot, layout)
+
+
 def _render_avery_l7108rev_sheet(samples, request: Request, copies: int = 1, start_position: int = 1) -> io.BytesIO:
     layout = AVERY_L7108REV
     pdf_buffer = io.BytesIO()
@@ -2055,20 +2317,20 @@ def _render_avery_l7108rev_sheet(samples, request: Request, copies: int = 1, sta
     c = canvas.Canvas(pdf_buffer, pagesize=page_size)
     page_width, page_height = page_size
 
-    slots = []
-    for row in range(layout["rows"]):
-        for col in range(layout["columns"]):
-            x = layout["margin_x"] + col * (layout["cell_width"] + layout["gap_x"])
-            y = page_height - layout["margin_y"] - layout["cell_height"] - row * (layout["cell_height"] + layout["gap_y"])
-            slots.append((x, y))
+    slots = _avery_l7108rev_slots(layout, page_height)
+    if DEBUG_LABEL_LAYOUT:
+        _draw_avery_debug_page(c, slots, layout)
 
     current_slot = max(0, min(8, start_position - 1))
     for sample in samples:
         for _ in range(max(1, copies)):
             if current_slot >= len(slots):
                 c.showPage()
+                if DEBUG_LABEL_LAYOUT:
+                    _draw_avery_debug_page(c, slots, layout)
                 current_slot = 0
-            x, y = slots[current_slot]
+            slot = slots[current_slot]
+            x, y = slot["x"], slot["y"]
             qr_data = _public_sample_url(request, sample.id)
             c.saveState()
             c.translate(x + layout["cell_width"], y)
