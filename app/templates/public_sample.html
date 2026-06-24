@@ -107,6 +107,8 @@
             <p class="empty">Sin CVC.</p>
             {% elif erp_data.status == 'multiple' %}
             <p class="empty">Varias coincidencias en ERP para este CVC.</p>
+            {% elif erp_data.status == 'not_found' %}
+            <p class="empty">No encontrado en el ERP.</p>
             {% elif erp_data.status == 'found' and erp_rows %}
             <div class="public-key-data">
                 {% for row in erp_rows %}
@@ -116,6 +118,26 @@
                 </div>
                 {% endfor %}
             </div>
+            {% if erp_summary_rows %}
+            <div class="public-key-data">
+                {% for row in erp_summary_rows %}
+                <div class="public-data-row">
+                    <span>{{ row.label }}</span>
+                    <strong>{{ row.value }}</strong>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if erp_traceability_summary_rows %}
+            <div class="public-key-data">
+                {% for row in erp_traceability_summary_rows %}
+                <div class="public-data-row">
+                    <span>{{ row.label }}</span>
+                    <strong>{{ row.value }}</strong>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% else %}
             <p class="empty">No encontrado en el ERP.</p>
             {% endif %}

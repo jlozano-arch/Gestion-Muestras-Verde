@@ -61,6 +61,54 @@ RAW_APPS_SCRIPT_FIELD_MAP = {
     "comentarios": "comments",
 }
 
+RAW_APPS_SCRIPT_SALE_FIELD_MAP = {
+    "cvv": "cvv",
+    "cliente": "client",
+    "calidad_venta": "sale_quality",
+    "sacos_vendidos": "bags_sold",
+    "kg_vendidos": "kg_sold",
+    "precio_venta": "sale_price",
+    "valor_contrato": "contract_value",
+    "fecha_factura": "invoice_date",
+    "cobro": "payment_status",
+    "incoterm_venta": "sale_incoterm",
+    "comentarios_venta": "sale_comments",
+}
+
+RAW_APPS_SCRIPT_SUMMARY_FIELD_MAP = {
+    "total_kg_vendidos": "total_kg_sold",
+    "total_sacos_vendidos": "total_bags_sold",
+    "numero_cvv": "cvv_count",
+    "clientes_unicos": "unique_clients",
+    "kg_comprados": "kg_purchased",
+    "kg_pendientes": "kg_pending",
+    "precio_compra": "purchase_price",
+    "precio_venta_medio": "average_sale_price",
+    "margen_bruto_medio": "average_gross_margin",
+}
+
+RAW_APPS_SCRIPT_MOVEMENT_FIELD_MAP = {
+    "origen": "source",
+    "fecha": "date",
+    "tipo_operacion": "operation_type",
+    "cvc": "cvc",
+    "cvv": "cvv",
+    "cliente_proveedor": "counterparty",
+    "sacos": "bags",
+    "calidad": "quality",
+    "estado": "status",
+}
+
+RAW_APPS_SCRIPT_TRACEABILITY_SUMMARY_FIELD_MAP = {
+    "total_sacos_movidos": "total_bags_moved",
+    "sacos_entrada": "bags_in",
+    "sacos_salida": "bags_out",
+    "sacos_app": "bags_app",
+    "sacos_deapp": "bags_deapp",
+    "clientes_unicos": "unique_clients",
+    "numero_cvv": "cvv_count",
+}
+
 DISPLAY_LABELS = {
     "cvc": "CVC",
     "provider": "Proveedor ERP",
@@ -81,6 +129,109 @@ DISPLAY_LABELS = {
     "incoterm": "Incoterm",
     "comments": "Comentarios ERP",
 }
+
+SALE_LABELS = {
+    "cvv": "CVV",
+    "client": "Cliente",
+    "sale_quality": "Calidad venta",
+    "bags_sold": "Sacos vendidos",
+    "kg_sold": "Kg vendidos",
+    "sale_price": "Precio venta",
+    "contract_value": "Valor contrato",
+    "invoice_date": "Fecha factura",
+    "payment_status": "Cobro",
+    "sale_incoterm": "Incoterm venta",
+    "sale_comments": "Comentarios venta",
+}
+
+SUMMARY_LABELS = {
+    "total_kg_sold": "Kg vendidos",
+    "total_bags_sold": "Sacos vendidos",
+    "cvv_count": "Numero CVV",
+    "unique_clients": "Clientes unicos",
+    "kg_purchased": "Kg comprados",
+    "kg_pending": "Kg pendientes",
+    "purchase_price": "Precio compra",
+    "average_sale_price": "Precio venta medio",
+    "average_gross_margin": "Margen bruto medio",
+    "total_bags_moved": "Sacos movidos",
+    "bags_in": "Sacos entrada",
+    "bags_out": "Sacos salida",
+    "bags_app": "Sacos APP",
+    "bags_deapp": "Sacos DEAPP",
+}
+
+MOVEMENT_LABELS = {
+    "source": "Origen",
+    "date": "Fecha",
+    "operation_type": "Operacion",
+    "cvc": "CVC",
+    "cvv": "CVV",
+    "counterparty": "Cliente/proveedor",
+    "bags": "Sacos",
+    "quality": "Calidad",
+    "status": "Estado",
+}
+
+PRIVATE_SALE_FIELDS = [
+    "cvv",
+    "client",
+    "sale_quality",
+    "bags_sold",
+    "kg_sold",
+    "sale_price",
+    "contract_value",
+    "invoice_date",
+    "payment_status",
+    "sale_incoterm",
+    "sale_comments",
+]
+
+PUBLIC_SUMMARY_FIELDS = [
+    "cvv_count",
+    "total_kg_sold",
+    "kg_pending",
+]
+
+PRIVATE_SUMMARY_FIELDS = [
+    "cvv_count",
+    "unique_clients",
+    "kg_purchased",
+    "total_kg_sold",
+    "kg_pending",
+    "total_bags_sold",
+    "purchase_price",
+    "average_sale_price",
+    "average_gross_margin",
+]
+
+PRIVATE_TRACEABILITY_SUMMARY_FIELDS = [
+    "cvv_count",
+    "total_bags_moved",
+    "bags_in",
+    "bags_out",
+    "bags_app",
+    "bags_deapp",
+    "unique_clients",
+]
+
+PUBLIC_TRACEABILITY_SUMMARY_FIELDS = [
+    "cvv_count",
+    "total_bags_moved",
+    "bags_out",
+]
+
+PRIVATE_MOVEMENT_FIELDS = [
+    "source",
+    "date",
+    "operation_type",
+    "cvc",
+    "cvv",
+    "counterparty",
+    "bags",
+    "quality",
+    "status",
+]
 
 
 def normalize_cvc(cvc: str | None) -> str:
@@ -111,6 +262,26 @@ NORMALIZED_ALIASES = {
 APPS_SCRIPT_FIELD_MAP = {
     _normalize_text(raw_key): field
     for raw_key, field in RAW_APPS_SCRIPT_FIELD_MAP.items()
+}
+
+APPS_SCRIPT_SALE_FIELD_MAP = {
+    _normalize_text(raw_key): field
+    for raw_key, field in RAW_APPS_SCRIPT_SALE_FIELD_MAP.items()
+}
+
+APPS_SCRIPT_SUMMARY_FIELD_MAP = {
+    _normalize_text(raw_key): field
+    for raw_key, field in RAW_APPS_SCRIPT_SUMMARY_FIELD_MAP.items()
+}
+
+APPS_SCRIPT_MOVEMENT_FIELD_MAP = {
+    _normalize_text(raw_key): field
+    for raw_key, field in RAW_APPS_SCRIPT_MOVEMENT_FIELD_MAP.items()
+}
+
+APPS_SCRIPT_TRACEABILITY_SUMMARY_FIELD_MAP = {
+    _normalize_text(raw_key): field
+    for raw_key, field in RAW_APPS_SCRIPT_TRACEABILITY_SUMMARY_FIELD_MAP.items()
 }
 
 
@@ -205,16 +376,36 @@ def _status(status: str, **extra: Any) -> dict[str, Any]:
     return {"status": status, **extra}
 
 
-def _normalize_apps_script_record(record: dict[str, Any] | None) -> dict[str, str]:
+def _normalize_record_with_map(record: dict[str, Any] | None, field_map: dict[str, str]) -> dict[str, str]:
     normalized = {}
     for raw_key, raw_value in (record or {}).items():
-        key = APPS_SCRIPT_FIELD_MAP.get(_normalize_text(raw_key))
+        key = field_map.get(_normalize_text(raw_key))
         if not key:
             continue
         value = _clean_value(raw_value)
         if value:
             normalized[key] = normalize_cvc(value) if key == "cvc" else value
     return normalized
+
+
+def _normalize_apps_script_record(record: dict[str, Any] | None) -> dict[str, str]:
+    return _normalize_record_with_map(record, APPS_SCRIPT_FIELD_MAP)
+
+
+def _normalize_apps_script_sale(record: dict[str, Any] | None) -> dict[str, str]:
+    return _normalize_record_with_map(record, APPS_SCRIPT_SALE_FIELD_MAP)
+
+
+def _normalize_apps_script_summary(record: dict[str, Any] | None) -> dict[str, str]:
+    return _normalize_record_with_map(record, APPS_SCRIPT_SUMMARY_FIELD_MAP)
+
+
+def _normalize_apps_script_movement(record: dict[str, Any] | None) -> dict[str, str]:
+    return _normalize_record_with_map(record, APPS_SCRIPT_MOVEMENT_FIELD_MAP)
+
+
+def _normalize_apps_script_traceability_summary(record: dict[str, Any] | None) -> dict[str, str]:
+    return _normalize_record_with_map(record, APPS_SCRIPT_TRACEABILITY_SUMMARY_FIELD_MAP)
 
 
 def _log_apps_script_response(url: str, response: httpx.Response, payload: Any = None) -> None:
@@ -250,12 +441,25 @@ def _apps_script_lookup(cvc: str) -> dict | None:
     status = _clean_value(payload.get("status")).lower()
     source = _clean_value(payload.get("source")) or "google_sheets_largos"
     if status == "not_found":
-        return None
+        return _status(
+            "not_found",
+            cvc=normalize_cvc(payload.get("cvc") or normalized_cvc),
+            source=source,
+            warnings=payload.get("warnings") or [],
+        )
     if status == "found":
         return _status(
             "found",
             cvc=normalize_cvc(payload.get("cvc") or normalized_cvc),
             data=_normalize_apps_script_record(payload.get("data")),
+            sales=[_normalize_apps_script_sale(item) for item in payload.get("ventas_asociadas") or []],
+            commercial_summary=_normalize_apps_script_summary(payload.get("resumen_comercial")),
+            traceability_movements=[
+                _normalize_apps_script_movement(item)
+                for item in payload.get("trazabilidad_movimientos") or []
+            ],
+            associated_cvvs=[_clean_value(item) for item in payload.get("cvv_asociados") or [] if _clean_value(item)],
+            traceability_summary=_normalize_apps_script_traceability_summary(payload.get("resumen_trazabilidad")),
             source=source,
             warnings=payload.get("warnings") or [],
         )
@@ -296,7 +500,7 @@ def _file_lookup(cvc: str) -> dict | None:
         return _status("not_configured", message=f"No se pudo leer {ERP_DATA_PATH_ENV}: {exc}")
     matches = [record for record in records if normalize_cvc(record.get("cvc")) == normalized_cvc]
     if not matches:
-        return None
+        return _status("not_found", cvc=normalized_cvc, source=ERP_SOURCE_FILE)
     if len(matches) > 1:
         return _status("multiple", cvc=normalized_cvc, count=len(matches), matches=matches, source=ERP_SOURCE_FILE)
     return _status("found", cvc=normalized_cvc, data=matches[0], source=ERP_SOURCE_FILE)
@@ -346,3 +550,71 @@ def erp_display_rows(data: dict | None, public: bool = False) -> list[dict[str, 
         if value:
             rows.append({"label": DISPLAY_LABELS[field], "value": value})
     return rows
+
+
+def erp_commercial_summary_rows(data: dict | None, public: bool = False) -> list[dict[str, str]]:
+    if not data or data.get("status") != "found":
+        return []
+    summary = data.get("commercial_summary") or {}
+    fields = PUBLIC_SUMMARY_FIELDS if public else PRIVATE_SUMMARY_FIELDS
+    rows = []
+    for field in fields:
+        value = _clean_value(summary.get(field))
+        if value:
+            rows.append({"label": SUMMARY_LABELS[field], "value": value})
+    if public:
+        status_value = _clean_value((data.get("data") or {}).get("contract_status"))
+        if status_value:
+            rows.append({"label": DISPLAY_LABELS["contract_status"], "value": status_value})
+    return rows
+
+
+def erp_sales_rows(data: dict | None) -> list[dict[str, str]]:
+    if not data or data.get("status") != "found":
+        return []
+    rows = []
+    for sale in data.get("sales") or []:
+        row = {}
+        for field in PRIVATE_SALE_FIELDS:
+            value = _clean_value(sale.get(field))
+            if value:
+                row[field] = value
+        if row:
+            rows.append(row)
+    return rows
+
+
+def erp_sales_columns() -> list[dict[str, str]]:
+    return [{"field": field, "label": SALE_LABELS[field]} for field in PRIVATE_SALE_FIELDS]
+
+
+def erp_traceability_summary_rows(data: dict | None, public: bool = False) -> list[dict[str, str]]:
+    if not data or data.get("status") != "found":
+        return []
+    summary = data.get("traceability_summary") or {}
+    fields = PUBLIC_TRACEABILITY_SUMMARY_FIELDS if public else PRIVATE_TRACEABILITY_SUMMARY_FIELDS
+    rows = []
+    for field in fields:
+        value = _clean_value(summary.get(field))
+        if value:
+            rows.append({"label": SUMMARY_LABELS[field], "value": value})
+    return rows
+
+
+def erp_traceability_movement_rows(data: dict | None) -> list[dict[str, str]]:
+    if not data or data.get("status") != "found":
+        return []
+    rows = []
+    for movement in data.get("traceability_movements") or []:
+        row = {}
+        for field in PRIVATE_MOVEMENT_FIELDS:
+            value = _clean_value(movement.get(field))
+            if value:
+                row[field] = value
+        if row:
+            rows.append(row)
+    return rows
+
+
+def erp_traceability_movement_columns() -> list[dict[str, str]]:
+    return [{"field": field, "label": MOVEMENT_LABELS[field]} for field in PRIVATE_MOVEMENT_FIELDS]

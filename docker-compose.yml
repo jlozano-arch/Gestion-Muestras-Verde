@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build: .
@@ -13,6 +11,8 @@ services:
       - DATABASE_URL=sqlite:///./data/muestras.db
       - UPLOADS_DIR=./uploads
       - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8000}
+      - ERP_SOURCE=${ERP_SOURCE:-file}
+      - ERP_APPS_SCRIPT_URL=${ERP_APPS_SCRIPT_URL:-}
       - DEBUG=true
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped

@@ -131,6 +131,8 @@
                 {% elif erp_data.status == 'multiple' %}
                     <p><strong>Varias coincidencias</strong> para CVC {{ erp_data.cvc }}.</p>
                     <small>Se encontraron {{ erp_data.count }} registros en el archivo ERP. Revise el exportado antes de usar estos datos.</small>
+                {% elif erp_data.status == 'not_found' %}
+                    <p class="empty">No encontrado en el ERP para CVC {{ sample.purchase_contract_cvc }}.</p>
                 {% elif erp_data.status == 'found' and erp_rows %}
                     <div class="erp-grid">
                         {% for row in erp_rows %}
@@ -144,6 +146,98 @@
                     <p class="empty">No encontrado en el ERP para CVC {{ sample.purchase_contract_cvc }}.</p>
                 {% endif %}
             </div>
+            {% if erp_data and erp_data.status == 'found' %}
+            <div class="section-header compact">
+                <div>
+                    <span class="eyebrow">Secuencia de movimientos</span>
+                    <h3>Trazabilidad comercial ERP</h3>
+                </div>
+            </div>
+            <div class="erp-panel">
+                {% if erp_traceability_summary_rows %}
+                <div class="erp-grid">
+                    {% for row in erp_traceability_summary_rows %}
+                    <div class="erp-field">
+                        <span>{{ row.label }}</span>
+                        <strong>{{ row.value }}</strong>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if erp_data.associated_cvvs %}
+                <div class="notes-section muted">
+                    <h4>CVV asociados</h4>
+                    <p>{{ erp_data.associated_cvvs|join(', ') }}</p>
+                </div>
+                {% endif %}
+
+                {% if erp_traceability_movement_rows %}
+                <div class="table-responsive erp-sales-table">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                {% for col in erp_traceability_movement_columns %}
+                                <th>{{ col.label }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for movement in erp_traceability_movement_rows %}
+                            <tr>
+                                {% for col in erp_traceability_movement_columns %}
+                                <td>{{ movement.get(col.field, '-') }}</td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+
+                <div class="section-header compact">
+                    <div>
+                        <span class="eyebrow">Complemento CONTRATOS</span>
+                        <h3>CVV en contratos</h3>
+                    </div>
+                </div>
+                {% if erp_summary_rows %}
+                <div class="erp-grid">
+                    {% for row in erp_summary_rows %}
+                    <div class="erp-field">
+                        <span>{{ row.label }}</span>
+                        <strong>{{ row.value }}</strong>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if erp_sales_rows %}
+                <div class="table-responsive erp-sales-table">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                {% for col in erp_sales_columns %}
+                                <th>{{ col.label }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sale in erp_sales_rows %}
+                            <tr>
+                                {% for col in erp_sales_columns %}
+                                <td>{{ sale.get(col.field, '-') }}</td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="empty">Sin CVV asociados.</p>
+                {% endif %}
+            </div>
+            {% endif %}
         </section>
 
         <section id="tastings" class="tab-content">

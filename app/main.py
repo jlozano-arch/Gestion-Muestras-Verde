@@ -25,7 +25,16 @@ from urllib.parse import quote_plus
 from .database import get_db, create_tables, SessionLocal
 from .models import Sample, Tasting, Shipment, Event, Document, SampleStatus, ImportBatch, ImportRow
 from .countries import get_country_name, get_country_flag, get_all_countries
-from .erp_integration import erp_display_rows, get_erp_data_by_cvc
+from .erp_integration import (
+    erp_commercial_summary_rows,
+    erp_display_rows,
+    erp_sales_columns,
+    erp_sales_rows,
+    erp_traceability_movement_columns,
+    erp_traceability_movement_rows,
+    erp_traceability_summary_rows,
+    get_erp_data_by_cvc,
+)
 
 # Create tables on startup
 create_tables()
@@ -733,6 +742,8 @@ async def public_sample_detail(sample_id: int, request: Request, db: Session = D
         "public_url": _public_sample_url(request, sample.id),
         "erp_data": erp_data,
         "erp_rows": erp_display_rows(erp_data, public=True),
+        "erp_summary_rows": erp_commercial_summary_rows(erp_data, public=True),
+        "erp_traceability_summary_rows": erp_traceability_summary_rows(erp_data, public=True),
     })
 
 
@@ -1150,6 +1161,12 @@ async def sample_detail(
         "flag": get_country_flag(sample.country_code),
         "erp_data": erp_data,
         "erp_rows": erp_display_rows(erp_data),
+        "erp_summary_rows": erp_commercial_summary_rows(erp_data),
+        "erp_sales_rows": erp_sales_rows(erp_data),
+        "erp_sales_columns": erp_sales_columns(),
+        "erp_traceability_summary_rows": erp_traceability_summary_rows(erp_data),
+        "erp_traceability_movement_rows": erp_traceability_movement_rows(erp_data),
+        "erp_traceability_movement_columns": erp_traceability_movement_columns(),
     })
 
 
@@ -2036,6 +2053,8 @@ LABEL_HEIGHT_MM = (PAGE_HEIGHT_MM - TOP_MARGIN_MM - BOTTOM_MARGIN_MM - (LABEL_RO
 INTERNAL_LABEL_WIDTH_MM = LABEL_HEIGHT_MM
 INTERNAL_LABEL_HEIGHT_MM = LABEL_WIDTH_MM
 DEBUG_LABEL_LAYOUT = os.getenv("DEBUG_LABEL_LAYOUT", "false").lower() == "true"
+LABEL_OFFSET_X_MM = float(os.getenv("LABEL_OFFSET_X_MM", "0"))
+LABEL_OFFSET_Y_MM = float(os.getenv("LABEL_OFFSET_Y_MM", "-10"))
 
 
 def _build_avery_l7108rev_layout():
@@ -2054,6 +2073,8 @@ def _build_avery_l7108rev_layout():
         "margin_bottom": BOTTOM_MARGIN_MM * mm,
         "gap_x": H_GAP_MM * mm,
         "gap_y": V_GAP_MM * mm,
+        "offset_x": LABEL_OFFSET_X_MM * mm,
+        "offset_y": LABEL_OFFSET_Y_MM * mm,
     }
 
 
@@ -2292,8 +2313,8 @@ def _avery_l7108rev_slots(layout, page_height):
     slots = []
     for row in range(layout["rows"]):
         for col in range(layout["columns"]):
-            x = layout["margin_left"] + col * (layout["cell_width"] + layout["gap_x"])
-            y = page_height - layout["margin_top"] - layout["cell_height"] - row * (layout["cell_height"] + layout["gap_y"])
+            x = layout["margin_left"] + col * (layout["cell_width"] + layout["gap_x"]) + layout["offset_x"]
+            y = page_height - layout["margin_top"] - layout["cell_height"] - row * (layout["cell_height"] + layout["gap_y"]) + layout["offset_y"]
             slots.append({"x": x, "y": y, "row": row + 1, "col": col + 1, "position": len(slots) + 1})
     return slots
 

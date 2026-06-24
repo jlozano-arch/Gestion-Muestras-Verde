@@ -1138,6 +1138,17 @@ legend {
     overflow-wrap: anywhere;
 }
 
+.erp-sales-table {
+    margin-top: 1rem;
+}
+
+.erp-sales-table .table th,
+.erp-sales-table .table td {
+    padding: 0.55rem 0.65rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
 .best-tasting {
     margin-top: 1.5rem;
 }
