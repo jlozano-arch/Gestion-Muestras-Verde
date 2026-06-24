@@ -98,6 +98,30 @@
         </section>
 
         <section class="public-section">
+            <h3>Datos ERP Indian</h3>
+            {% if not erp_data or erp_data.status == 'not_configured' %}
+            <p class="empty">Integracion ERP no configurada.</p>
+            {% elif erp_data.status == 'error' %}
+            <p class="empty">ERP no disponible temporalmente.</p>
+            {% elif erp_data.status == 'no_cvc' %}
+            <p class="empty">Sin CVC.</p>
+            {% elif erp_data.status == 'multiple' %}
+            <p class="empty">Varias coincidencias en ERP para este CVC.</p>
+            {% elif erp_data.status == 'found' and erp_rows %}
+            <div class="public-key-data">
+                {% for row in erp_rows %}
+                <div class="public-data-row">
+                    <span>{{ row.label }}</span>
+                    <strong>{{ row.value }}</strong>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="empty">No encontrado en el ERP.</p>
+            {% endif %}
+        </section>
+
+        <section class="public-section">
             <h3>Cata</h3>
             {% if latest_tasting %}
             <div class="public-key-data">

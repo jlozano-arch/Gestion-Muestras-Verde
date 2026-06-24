@@ -25,6 +25,7 @@ from urllib.parse import quote_plus
 from .database import get_db, create_tables, SessionLocal
 from .models import Sample, Tasting, Shipment, Event, Document, SampleStatus, ImportBatch, ImportRow
 from .countries import get_country_name, get_country_flag, get_all_countries
+from .erp_integration import erp_display_rows, get_erp_data_by_cvc
 
 # Create tables on startup
 create_tables()
@@ -720,6 +721,7 @@ async def public_sample_detail(sample_id: int, request: Request, db: Session = D
     public_documents.sort(key=lambda item: (0 if item["is_image"] else 1, item["photo_order"], item["doc"].upload_date or datetime.min))
     public_images = [item for item in public_documents if item["is_image"]]
     public_files = [item for item in public_documents if not item["is_image"]]
+    erp_data = get_erp_data_by_cvc(sample.purchase_contract_cvc) if sample.purchase_contract_cvc else {"status": "no_cvc"}
 
     return templates.TemplateResponse("public_sample.html", {
         "request": request,
@@ -729,6 +731,8 @@ async def public_sample_detail(sample_id: int, request: Request, db: Session = D
         "public_images": public_images,
         "public_files": public_files,
         "public_url": _public_sample_url(request, sample.id),
+        "erp_data": erp_data,
+        "erp_rows": erp_display_rows(erp_data, public=True),
     })
 
 
@@ -1133,6 +1137,7 @@ async def sample_detail(
     best_tasting = None
     if tastings:
         best_tasting = max(tastings, key=lambda x: x.indian_score or 0)
+    erp_data = get_erp_data_by_cvc(sample.purchase_contract_cvc) if sample.purchase_contract_cvc else {"status": "no_cvc"}
     
     return templates.TemplateResponse("sample_detail.html", {
         "request": request,
@@ -1143,6 +1148,8 @@ async def sample_detail(
         "documents": documents,
         "best_tasting": best_tasting,
         "flag": get_country_flag(sample.country_code),
+        "erp_data": erp_data,
+        "erp_rows": erp_display_rows(erp_data),
     })
 
 

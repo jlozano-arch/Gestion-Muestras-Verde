@@ -112,6 +112,38 @@
                 <p>{{ sample.notes }}</p>
             </div>
             {% endif %}
+
+            <div class="section-header compact">
+                <div>
+                    <span class="eyebrow">Solo lectura</span>
+                    <h3>Datos ERP Indian</h3>
+                </div>
+            </div>
+            <div class="erp-panel erp-status-{{ erp_data.status if erp_data else 'not_found' }}">
+                {% if not erp_data or erp_data.status == 'not_configured' %}
+                    <p class="empty">Integracion ERP no configurada.</p>
+                    {% if erp_data and erp_data.message %}<small>{{ erp_data.message }}</small>{% endif %}
+                {% elif erp_data.status == 'error' %}
+                    <p><strong>ERP no disponible.</strong></p>
+                    {% if erp_data.message %}<small>{{ erp_data.message }}</small>{% endif %}
+                {% elif erp_data.status == 'no_cvc' %}
+                    <p class="empty">Sin CVC.</p>
+                {% elif erp_data.status == 'multiple' %}
+                    <p><strong>Varias coincidencias</strong> para CVC {{ erp_data.cvc }}.</p>
+                    <small>Se encontraron {{ erp_data.count }} registros en el archivo ERP. Revise el exportado antes de usar estos datos.</small>
+                {% elif erp_data.status == 'found' and erp_rows %}
+                    <div class="erp-grid">
+                        {% for row in erp_rows %}
+                        <div class="erp-field">
+                            <span>{{ row.label }}</span>
+                            <strong>{{ row.value }}</strong>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="empty">No encontrado en el ERP para CVC {{ sample.purchase_contract_cvc }}.</p>
+                {% endif %}
+            </div>
         </section>
 
         <section id="tastings" class="tab-content">

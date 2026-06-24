@@ -9,6 +9,7 @@
 - [Estado funcional](#estado-funcional)
 - [Funcionalidades implementadas](#funcionalidades-implementadas)
 - [Auditoria reciente del dashboard](#auditoria-reciente-del-dashboard)
+- [Integracion ERP Indian](#integracion-erp-indian)
 - [Ultimos commits relevantes](#ultimos-commits-relevantes)
 - [Pendientes conocidos](#pendientes-conocidos)
 - [Ideas futuras](#ideas-futuras)
@@ -71,6 +72,7 @@ La aplicacion esta preparada para operar en red local mediante Docker. El dashbo
 - Eliminacion masiva de muestras.
 - Limpieza administrativa de muestras.
 - Ficha PDF completa de muestra en `/samples/{id}/pdf`.
+- Integracion ERP Indian inicial, solo lectura, por CVC desde archivo CSV/XLSX exportado.
 
 ## Auditoria reciente del dashboard
 
@@ -88,6 +90,46 @@ Metricas auditadas:
 - Muestras sin stock.
 
 Se corrigio el calculo de muestras sin stock para tratar `NULL` como cero y se ajusto la logica de envio para actualizar estado usando gramos disponibles.
+
+## Integracion ERP Indian
+
+La integracion ERP disponible en V1 es estrictamente de solo lectura. No escribe en el ERP, no modifica stock, no crea contratos, no aplica contratos y no escribe en Google Sheets.
+
+Configuracion:
+
+- `ERP_SOURCE=file`: usa archivo exportado.
+- `ERP_SOURCE=apps_script`: consulta un endpoint Apps Script solo lectura.
+- Variable de entorno: `ERP_DATA_PATH`.
+- Variable de entorno: `ERP_APPS_SCRIPT_URL`.
+- Formatos soportados: CSV y XLSX.
+- Matching: CVC normalizado con coincidencia exacta.
+
+Ejemplo:
+
+```text
+ERP_SOURCE=apps_script
+ERP_APPS_SCRIPT_URL=https://script.google.com/macros/s/XXXXXXXX/exec
+```
+
+Endpoint Apps Script previsto:
+
+```text
+GET ?action=getDatosMuestraERP&cvc=53-2026CVC
+```
+
+La busqueda Apps Script se hace directamente sobre hojas de datos del ERP/TRACER, concretamente `LARGOS`, sin depender de la interfaz TRACER. Datos confirmados: cabecera en fila 3, datos desde fila 4, CVC en columna C y encabezado `CTR. COMPRA`. Si Apps Script no esta configurado o falla tecnicamente, la app muestra `ERP no disponible`.
+
+Estados contemplados:
+
+- `not_configured`
+- `no_cvc`
+- `found`
+- `multiple`
+- `not_found`
+
+En `/samples/{id}` se muestran datos privados del ERP cuando existe una coincidencia unica, incluyendo proveedor, calidad, pais/origen, almacen, sacos/kg comprados, sacos/kg disponibles, precio compra, fecha contrato y estado contrato.
+
+En `/public/samples/{id}` solo se muestran campos publicos limitados: calidad ERP, pais/origen, almacen, kg disponibles y estado contrato. No se muestra precio de compra.
 
 ## Ultimos commits relevantes
 
@@ -112,7 +154,7 @@ e3c9023 Make sample filters data-driven
 
 ## Ideas futuras
 
-- Integracion ERP Indian.
+- Integracion ERP Indian de escritura o sincronizacion bidireccional, si se aprueba en una fase posterior.
 - Historial de cambios por usuario.
 - Portal clientes.
 - Exportaciones avanzadas.

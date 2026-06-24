@@ -1074,6 +1074,70 @@ legend {
     font-size: 0.95rem;
 }
 
+.erp-panel {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 1rem;
+}
+
+.erp-panel p {
+    margin: 0;
+}
+
+.erp-panel small {
+    display: block;
+    margin-top: 0.35rem;
+    color: var(--text-muted);
+}
+
+.erp-status-found {
+    border-color: rgba(40, 132, 88, 0.28);
+    background: #f7fbf8;
+}
+
+.erp-status-multiple {
+    border-color: rgba(184, 120, 27, 0.35);
+    background: #fff9ee;
+}
+
+.erp-status-not_configured,
+.erp-status-no_cvc,
+.erp-status-not_found {
+    background: #f8faf9;
+}
+
+.erp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+}
+
+.erp-field {
+    min-width: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.erp-field span {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.erp-field strong {
+    display: block;
+    color: var(--text);
+    font-size: 0.98rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
 .best-tasting {
     margin-top: 1.5rem;
 }
