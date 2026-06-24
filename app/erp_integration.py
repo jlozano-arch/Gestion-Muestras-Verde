@@ -1,13 +1,14 @@
 import csv
 import json
+import logging
 import os
 import re
 import unicodedata
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
-from urllib.request import urlopen
 
+import httpx
 from openpyxl import load_workbook
 
 
@@ -16,6 +17,7 @@ ERP_SOURCE_ENV = "ERP_SOURCE"
 ERP_APPS_SCRIPT_URL_ENV = "ERP_APPS_SCRIPT_URL"
 ERP_SOURCE_FILE = "file"
 ERP_SOURCE_APPS_SCRIPT = "apps_script"
+ERP_LOG = logging.getLogger("app.erp_integration")
 
 FIELD_ALIASES = {
     "cvc": {"cvc", "ctr compra", "ctr. compra", "contrato compra", "contrato de compra", "purchase contract"},
@@ -50,7 +52,7 @@ RAW_APPS_SCRIPT_FIELD_MAP = {
     "kg_comprados": "kg_purchased",
     "sacos_disponibles": "bags_available",
     "kg_disponibles": "kg_available",
-    "stock_sacos": "bags_available",
+    "stock_sacos": "stock_bags",
     "precio_compra": "purchase_price",
     "fecha_contrato": "contract_date",
     "estado_contrato": "contract_status",
@@ -71,6 +73,7 @@ DISPLAY_LABELS = {
     "bags_purchased": "Sacos comprados",
     "kg_purchased": "Kg comprados",
     "bags_available": "Sacos disponibles",
+    "stock_bags": "Stock sacos",
     "kg_available": "Kg disponibles",
     "purchase_price": "Precio compra",
     "contract_date": "Fecha contrato",
@@ -214,6 +217,14 @@ def _normalize_apps_script_record(record: dict[str, Any] | None) -> dict[str, st
     return normalized
 
 
+def _log_apps_script_response(url: str, response: httpx.Response, payload: Any = None) -> None:
+    ERP_LOG.warning("ERP Apps Script URL consultada: %s", url)
+    ERP_LOG.warning("ERP Apps Script status_code: %s", response.status_code)
+    ERP_LOG.warning("ERP Apps Script content-type: %s", response.headers.get("content-type", ""))
+    ERP_LOG.warning("ERP Apps Script response.text[0:500]: %s", response.text[:500])
+    ERP_LOG.warning("ERP Apps Script response.json(): %s", payload)
+
+
 def _apps_script_lookup(cvc: str) -> dict | None:
     normalized_cvc = normalize_cvc(cvc)
     endpoint = os.getenv(ERP_APPS_SCRIPT_URL_ENV, "").strip()
@@ -225,8 +236,14 @@ def _apps_script_lookup(cvc: str) -> dict | None:
     separator = "&" if "?" in endpoint else "?"
     url = f"{endpoint}{separator}{urlencode({'action': 'getDatosMuestraERP', 'cvc': normalized_cvc})}"
     try:
-        with urlopen(url, timeout=8) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+        with httpx.Client(follow_redirects=True, timeout=8.0, headers={"Accept": "application/json"}) as client:
+            response = client.get(url)
+        try:
+            payload = response.json()
+        except Exception:
+            payload = json.loads(response.text)
+        _log_apps_script_response(url, response, payload)
+        response.raise_for_status()
     except Exception as exc:
         return _status("error", message=f"No se pudo consultar Apps Script: {exc}", source="google_sheets_largos")
 
@@ -303,6 +320,7 @@ def erp_display_rows(data: dict | None, public: bool = False) -> list[dict[str, 
         "warehouse_lot",
         "sample_reference",
         "bags_available",
+        "stock_bags",
         "kg_available",
         "contract_status",
     ] if public else [
@@ -315,6 +333,7 @@ def erp_display_rows(data: dict | None, public: bool = False) -> list[dict[str, 
         "bags_purchased",
         "kg_purchased",
         "bags_available",
+        "stock_bags",
         "kg_available",
         "purchase_price",
         "incoterm",
