@@ -18,6 +18,8 @@ ERP_APPS_SCRIPT_URL_ENV = "ERP_APPS_SCRIPT_URL"
 ERP_SOURCE_FILE = "file"
 ERP_SOURCE_APPS_SCRIPT = "apps_script"
 ERP_LOG = logging.getLogger("app.erp_integration")
+ERP_BASIC_TIMEOUT_SECONDS = 8.0
+ERP_TRACE_TIMEOUT_SECONDS = 25.0
 
 FIELD_ALIASES = {
     "cvc": {"cvc", "ctr compra", "ctr. compra", "contrato compra", "contrato de compra", "purchase contract"},
@@ -416,7 +418,7 @@ def _log_apps_script_response(url: str, response: httpx.Response, payload: Any =
     ERP_LOG.warning("ERP Apps Script response.json(): %s", payload)
 
 
-def _apps_script_lookup(cvc: str) -> dict | None:
+def _apps_script_request(cvc: str, action: str, timeout_seconds: float) -> dict | None:
     normalized_cvc = normalize_cvc(cvc)
     endpoint = os.getenv(ERP_APPS_SCRIPT_URL_ENV, "").strip()
     if not endpoint:
@@ -425,9 +427,9 @@ def _apps_script_lookup(cvc: str) -> dict | None:
         return _status("no_cvc")
 
     separator = "&" if "?" in endpoint else "?"
-    url = f"{endpoint}{separator}{urlencode({'action': 'getDatosMuestraERP', 'cvc': normalized_cvc})}"
+    url = f"{endpoint}{separator}{urlencode({'action': action, 'cvc': normalized_cvc})}"
     try:
-        with httpx.Client(follow_redirects=True, timeout=8.0, headers={"Accept": "application/json"}) as client:
+        with httpx.Client(follow_redirects=True, timeout=timeout_seconds, headers={"Accept": "application/json"}) as client:
             response = client.get(url)
         try:
             payload = response.json()
@@ -483,6 +485,17 @@ def _apps_script_lookup(cvc: str) -> dict | None:
     return _status("error", message=f"Respuesta ERP no reconocida: {status or 'sin status'}", source=source)
 
 
+def _apps_script_lookup(cvc: str) -> dict | None:
+    return _apps_script_request(cvc, "getDatosMuestraERP", ERP_BASIC_TIMEOUT_SECONDS)
+
+
+def _apps_script_trace_lookup(cvc: str) -> dict | None:
+    result = _apps_script_request(cvc, "getTrazabilidadMuestraERP", ERP_TRACE_TIMEOUT_SECONDS)
+    if result and result.get("status") == "error" and "timed out" in (result.get("message") or "").lower():
+        result["message"] = "Trazabilidad no disponible temporalmente"
+    return result
+
+
 def _file_lookup(cvc: str) -> dict | None:
     normalized_cvc = normalize_cvc(cvc)
     erp_path = os.getenv(ERP_DATA_PATH_ENV, "").strip()
@@ -512,6 +525,14 @@ def get_erp_data_by_cvc(cvc: str) -> dict | None:
     if source == ERP_SOURCE_APPS_SCRIPT:
         return _apps_script_lookup(cvc)
     return _file_lookup(cvc)
+
+
+def get_erp_trace_by_cvc(cvc: str) -> dict | None:
+    """Read-only lookup of slower ERP traceability data by normalized CVC."""
+    source = os.getenv(ERP_SOURCE_ENV, ERP_SOURCE_FILE).strip().lower()
+    if source == ERP_SOURCE_APPS_SCRIPT:
+        return _apps_script_trace_lookup(cvc)
+    return _status("not_configured", message="La trazabilidad ERP requiere ERP_SOURCE=apps_script")
 
 
 def erp_display_rows(data: dict | None, public: bool = False) -> list[dict[str, str]]:

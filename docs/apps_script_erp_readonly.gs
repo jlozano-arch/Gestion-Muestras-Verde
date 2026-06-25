@@ -19,13 +19,11 @@ const ERP_DATA_START_ROW = 4;
 const ERP_CVC_FALLBACK_COLUMN = 3;
 const ERP_CVV_FALLBACK_COLUMN = 37; // AK
 const ERP_SOURCE = 'google_sheets_largos';
-const TRACER_FUNCTION_CANDIDATES = [
-  'getTrazabilidadPorCVC',
-  'obtenerTrazabilidadPorCVC',
-  'generarTrazabilidadPorCVC',
-  'getSecuenciaMovimientosPorCVC',
-  'obtenerSecuenciaMovimientosPorCVC'
-];
+const ERP_READONLY_VERSION = 'trace_fixed_columns_no_fact_almacen';
+const ERP_TRACE_MAX_ROWS_PER_SHEET = 5000;
+const ERP_ALMACEN_SHEET_NAME = 'ALMACÉN';
+const ERP_ALMACEN_FALLBACK_SHEET_NAME = 'ALMACEN';
+const ERP_APPLICATIONS_SHEET_NAME = 'APLICACIONES';
 
 const LARGOS_FIELD_ALIASES = {
   cvc: ['CTR. COMPRA', 'CTR COMPRA', 'CVC', 'CONTRATO COMPRA', 'CONTRATO DE COMPRA'],
@@ -43,39 +41,20 @@ const LARGOS_FIELD_ALIASES = {
   estado: ['ESTADO']
 };
 
-const CONTRACT_FIELD_ALIASES = {
-  cvc: ['CTR. COMPRA', 'CTR COMPRA', 'CVC', 'CONTRATO COMPRA', 'CONTRATO DE COMPRA'],
-  cvv: ['CTR VENTA', 'CTR. VENTA', 'CVV', 'CONTRATO VENTA'],
-  cliente: ['CLIENTE'],
-  calidad_venta: ['CALIDAD'],
-  sacos_vendidos: ['N SACOS', 'NO SACOS', 'NUMERO SACOS', 'SACOS'],
-  kg_vendidos: ['KG'],
-  precio_venta: ['PRECIO VENTA C/TM', 'PRECIO VENTA CTM', 'PRECIO VENTA'],
-  valor_contrato: ['VALOR CONTRATO EUROS', 'VALOR CONTRATO'],
-  fecha_factura: ['FECHA FACTURA'],
-  cobro: ['COBRO'],
-  incoterm_venta: ['INCOTERM'],
-  comentarios_venta: ['COMENTARIOS']
-};
-
-const MOVEMENT_FIELD_ALIASES = {
-  origen: ['ORIGEN', 'HOJA', 'FUENTE'],
-  fecha: ['FECHA', 'FECHA MOVIMIENTO', 'DATE'],
-  tipo_operacion: ['TIPO OPERACION', 'TIPO DE OPERACION', 'OPERACION', 'MOVIMIENTO'],
-  cvc: ['CTR. COMPRA', 'CTR COMPRA', 'CVC', 'CONTRATO COMPRA'],
-  cvv: ['CTR VENTA', 'CTR. VENTA', 'CVV', 'CONTRATO VENTA'],
-  cliente_proveedor: ['CLIENTE PROVEEDOR', 'CLIENTE/PROVEEDOR', 'CLIENTE', 'PROVEEDOR'],
-  sacos: ['SACOS', 'N SACOS', 'NO SACOS', 'NUMERO SACOS', 'CANTIDAD SACOS'],
-  calidad: ['CALIDAD'],
-  estado: ['ESTADO', 'STATUS']
-};
-
 function doGet(e) {
-  const action = e && e.parameter ? e.parameter.action : '';
-  if (action === 'getDatosMuestraERP') {
-    return jsonResponse(getDatosMuestraERP_(e.parameter.cvc || ''));
+  try {
+    const action = e && e.parameter ? e.parameter.action : '';
+    if (action === 'getDatosMuestraERP') {
+      return jsonResponse(getDatosMuestraERP_(e.parameter.cvc || ''));
+    }
+    if (action === 'getTrazabilidadMuestraERP') {
+      return jsonResponse(getTrazabilidadMuestraERP_(e.parameter.cvc || ''));
+    }
+    return jsonResponse(response_('error', '', {}, [], [], {}, [], [], {}, ['Accion no soportada']));
+  } catch (err) {
+    console.log('Error no controlado ERP endpoint: %s', err && err.stack ? err.stack : err);
+    return jsonResponse(response_('error', '', {}, [], [], {}, [], [], {}, [String(err)]));
   }
-  return jsonResponse(response_('error', '', {}, [], [], {}, [], [], {}, ['Accion no soportada']));
 }
 
 function getDatosMuestraERP_(cvc) {
@@ -103,6 +82,47 @@ function getDatosMuestraERP_(cvc) {
     );
   }
 
+  return response_(
+    'found',
+    normalizedCvc,
+    largosResult.data,
+    [],
+    [],
+    {},
+    [],
+    [],
+    {},
+    largosResult.warnings || []
+  );
+}
+
+function getTrazabilidadMuestraERP_(cvc) {
+  const startedAt = new Date();
+  const startedMs = Date.now();
+  const normalizedCvc = normalizeCvc_(cvc);
+  console.log('getTrazabilidadMuestraERP cvc=%s normalized=%s', cvc, normalizedCvc);
+
+  if (!normalizedCvc) {
+    return traceResponse_(response_('error', '', {}, [], [], {}, [], [], {}, ['CVC obligatorio']), startedAt, startedMs, { sheets: [], rows: 0 });
+  }
+
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const largosResult = findLargosRecord_(spreadsheet, normalizedCvc);
+  if (largosResult.status !== 'found') {
+    return traceResponse_(response_(
+      largosResult.status,
+      normalizedCvc,
+      largosResult.data || {},
+      largosResult.matches || [],
+      [],
+      {},
+      [],
+      [],
+      {},
+      largosResult.warnings || []
+    ), startedAt, startedMs, { sheets: [], rows: 0 });
+  }
+
   const traceabilityResult = findTraceabilityMovements_(spreadsheet, normalizedCvc);
   const salesResult = findAssociatedSales_(spreadsheet, normalizedCvc, largosResult.data);
   const warnings = [].concat(largosResult.warnings || [], traceabilityResult.warnings || [], salesResult.warnings || []);
@@ -119,7 +139,8 @@ function getDatosMuestraERP_(cvc) {
     warnings.length
   );
 
-  return response_(
+  const stats = mergeTraceStats_(traceabilityResult.stats, salesResult.stats);
+  return traceResponse_(response_(
     'found',
     normalizedCvc,
     largosResult.data,
@@ -130,7 +151,13 @@ function getDatosMuestraERP_(cvc) {
     associatedCvvs,
     traceabilitySummary,
     warnings
-  );
+  ), startedAt, startedMs, stats);
+}
+
+function test_getTrazabilidadMuestraERP_18_2026CVC() {
+  const result = getTrazabilidadMuestraERP_('18-2026CVC');
+  console.log(JSON.stringify(result, null, 2));
+  return result;
 }
 
 function findLargosRecord_(spreadsheet, normalizedCvc) {
@@ -165,144 +192,179 @@ function findLargosRecord_(spreadsheet, normalizedCvc) {
 function findAssociatedSales_(spreadsheet, normalizedCvc, largosData) {
   const sheet = spreadsheet.getSheetByName(ERP_CONTRACTS_SHEET_NAME);
   if (!sheet) {
-    return { sales: [], warnings: ['No existe la hoja CONTRATOS'] };
+    return { sales: [], warnings: ['No existe la hoja CONTRATOS'], stats: { sheets: [], rows: 0 } };
   }
 
-  const table = readSheetTable_(sheet, CONTRACT_FIELD_ALIASES, ERP_CVC_FALLBACK_COLUMN, 'CTR. COMPRA');
-  if (table.error) {
-    return { sales: [], warnings: [table.error] };
-  }
-  if (table.fieldIndexes.cvv === undefined && sheet.getLastColumn() >= ERP_CVV_FALLBACK_COLUMN) {
-    table.fieldIndexes.cvv = ERP_CVV_FALLBACK_COLUMN - 1;
-    table.warnings.push('No se detecto columna CTR VENTA por encabezado; se usa fallback columna AK');
+  const lastRow = sheet.getLastRow();
+  const lastColumn = sheet.getLastColumn();
+  if (lastRow < 2 || lastColumn < 64) {
+    return { sales: [], warnings: ['La hoja CONTRATOS no contiene columnas hasta BL'], stats: { sheets: [ERP_CONTRACTS_SHEET_NAME], rows: 0 } };
   }
 
+  let dataRows = lastRow - 1;
+  const warnings = [];
+  if (dataRows > ERP_TRACE_MAX_ROWS_PER_SHEET) {
+    dataRows = ERP_TRACE_MAX_ROWS_PER_SHEET;
+    warnings.push('Hoja CONTRATOS limitada a ' + ERP_TRACE_MAX_ROWS_PER_SHEET + ' filas para evitar timeout');
+  }
+  const rows = sheet.getRange(2, 1, dataRows, lastColumn).getValues();
   const sales = [];
-  for (let i = 0; i < table.rows.length; i++) {
-    const row = table.rows[i];
-    const rowCvc = normalizeCvc_(row[table.fieldIndexes.cvc]);
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowCvc = normalizeCvc_(row[2]); // CONTRATOS C
     if (rowCvc === normalizedCvc) {
-      sales.push(recordFromRow_(row, table.fieldIndexes));
+      const sale = contractSaleFromFixedRow_(row);
+      if (sale.cvv) {
+        sales.push(sale);
+      }
     }
   }
-  return { sales: sales, warnings: table.warnings };
+  return { sales: sales, warnings: warnings, stats: { sheets: [ERP_CONTRACTS_SHEET_NAME], rows: rows.length } };
 }
 
 function findTraceabilityMovements_(spreadsheet, normalizedCvc) {
-  const tracerResult = tryTracerHook_(normalizedCvc);
-  if (tracerResult.movements.length > 0) {
-    return tracerResult;
-  }
-  const scanResult = scanMovementSheets_(spreadsheet, normalizedCvc);
-  scanResult.warnings = [].concat(tracerResult.warnings || [], scanResult.warnings || []);
-  return scanResult;
+  return readFixedTraceabilitySheets_(spreadsheet, normalizedCvc);
 }
 
-function tryTracerHook_(normalizedCvc) {
-  const warnings = [];
-  for (let i = 0; i < TRACER_FUNCTION_CANDIDATES.length; i++) {
-    const name = TRACER_FUNCTION_CANDIDATES[i];
-    try {
-      const fn = globalThis[name];
-      if (typeof fn !== 'function') {
-        continue;
-      }
-      console.log('Usando funcion TRACER para trazabilidad: %s', name);
-      const result = fn(normalizedCvc);
-      const movements = normalizeTracerMovements_(result);
-      return { movements: movements, warnings: warnings };
-    } catch (err) {
-      warnings.push('Funcion TRACER ' + name + ' fallo: ' + err);
-    }
-  }
-  warnings.push('No se encontro funcion TRACER reutilizable; se escanean hojas con movimientos');
-  return { movements: [], warnings: warnings };
-}
-
-function normalizeTracerMovements_(result) {
-  if (!result) {
-    return [];
-  }
-  if (Array.isArray(result)) {
-    return result.map(normalizeMovementObject_).filter(hasMovementData_);
-  }
-  if (Array.isArray(result.movimientos)) {
-    return result.movimientos.map(normalizeMovementObject_).filter(hasMovementData_);
-  }
-  if (Array.isArray(result.trazabilidad_movimientos)) {
-    return result.trazabilidad_movimientos.map(normalizeMovementObject_).filter(hasMovementData_);
-  }
-  return [];
-}
-
-function scanMovementSheets_(spreadsheet, normalizedCvc) {
+function readFixedTraceabilitySheets_(spreadsheet, normalizedCvc) {
   const warnings = [];
   const movements = [];
-  const sheets = spreadsheet.getSheets();
-  for (let i = 0; i < sheets.length; i++) {
-    const sheet = sheets[i];
-    const name = sheet.getName();
-    if (name === ERP_LARGOS_SHEET_NAME || name === ERP_CONTRACTS_SHEET_NAME) {
-      continue;
-    }
-    const table = readMovementTable_(sheet);
-    if (!table) {
-      continue;
-    }
-    for (let rowIndex = 0; rowIndex < table.rows.length; rowIndex++) {
-      const row = table.rows[rowIndex];
-      const rowCvc = normalizeCvc_(row[table.fieldIndexes.cvc]);
-      if (rowCvc !== normalizedCvc) {
-        continue;
-      }
-      const movement = recordFromRow_(row, table.fieldIndexes);
-      movement.origen = movement.origen || name;
-      movements.push(normalizeMovementObject_(movement));
-    }
+  const sheetsConsulted = [];
+  let rowsAnalyzed = 0;
+
+  const almacenResult = findAlmacenMovements_(spreadsheet, normalizedCvc);
+  warnings.push.apply(warnings, almacenResult.warnings || []);
+  movements.push.apply(movements, almacenResult.movements || []);
+  rowsAnalyzed += almacenResult.stats.rows;
+  if (almacenResult.stats.sheets.length > 0) {
+    sheetsConsulted.push.apply(sheetsConsulted, almacenResult.stats.sheets);
   }
+
+  const applicationsResult = findApplicationMovements_(spreadsheet, normalizedCvc);
+  warnings.push.apply(warnings, applicationsResult.warnings || []);
+  movements.push.apply(movements, applicationsResult.movements || []);
+  rowsAnalyzed += applicationsResult.stats.rows;
+  if (applicationsResult.stats.sheets.length > 0) {
+    sheetsConsulted.push.apply(sheetsConsulted, applicationsResult.stats.sheets);
+  }
+
   if (movements.length === 0) {
-    warnings.push('No se encontraron movimientos para el CVC en hojas escaneadas');
+    warnings.push('No se encontraron movimientos en ALMACEN/APLICACIONES para el CVC');
   }
-  return { movements: movements, warnings: warnings };
+  return { movements: movements, warnings: warnings, stats: { sheets: sheetsConsulted, rows: rowsAnalyzed } };
 }
 
-function readMovementTable_(sheet) {
+function findAlmacenMovements_(spreadsheet, normalizedCvc) {
+  const sheet = spreadsheet.getSheetByName(ERP_ALMACEN_SHEET_NAME) || spreadsheet.getSheetByName(ERP_ALMACEN_FALLBACK_SHEET_NAME);
+  if (!sheet) {
+    return { movements: [], warnings: ['No existe la hoja ALMACEN'], stats: { sheets: [], rows: 0 } };
+  }
+
   const lastRow = sheet.getLastRow();
   const lastColumn = sheet.getLastColumn();
-  if (lastRow < ERP_DATA_START_ROW || lastColumn < ERP_CVC_FALLBACK_COLUMN) {
-    return null;
+  if (lastRow < 2 || lastColumn < 28) {
+    return { movements: [], warnings: ['La hoja ALMACEN no contiene columnas hasta AB'], stats: { sheets: [sheet.getName()], rows: 0 } };
   }
-  const maxHeaderRows = Math.min(10, lastRow);
-  for (let headerRow = 1; headerRow <= maxHeaderRows; headerRow++) {
-    const headers = sheet.getRange(headerRow, 1, 1, lastColumn).getValues()[0];
-    const fieldIndexes = mapHeaders_(headers, MOVEMENT_FIELD_ALIASES);
-    if (fieldIndexes.cvc !== undefined && (fieldIndexes.cvv !== undefined || fieldIndexes.tipo_operacion !== undefined || fieldIndexes.sacos !== undefined)) {
-      const rows = sheet.getRange(headerRow + 1, 1, lastRow - headerRow, lastColumn).getValues();
-      return { rows: rows, fieldIndexes: fieldIndexes };
+
+  let dataRows = lastRow - 1;
+  const warnings = [];
+  if (dataRows > ERP_TRACE_MAX_ROWS_PER_SHEET) {
+    dataRows = ERP_TRACE_MAX_ROWS_PER_SHEET;
+    warnings.push('Hoja ' + sheet.getName() + ' limitada a ' + ERP_TRACE_MAX_ROWS_PER_SHEET + ' filas para evitar timeout');
+  }
+  const rows = sheet.getRange(2, 1, dataRows, lastColumn).getValues();
+  const movements = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (normalizeCvc_(row[9]) === normalizedCvc) { // ALMACEN J
+      movements.push(almacenMovementFromFixedRow_(row));
     }
   }
-  return null;
+  return { movements: movements, warnings: warnings, stats: { sheets: [sheet.getName()], rows: rows.length } };
 }
 
-function normalizeMovementObject_(raw) {
+function findApplicationMovements_(spreadsheet, normalizedCvc) {
+  const sheet = spreadsheet.getSheetByName(ERP_APPLICATIONS_SHEET_NAME);
+  if (!sheet) {
+    return { movements: [], warnings: ['No existe la hoja APLICACIONES'], stats: { sheets: [], rows: 0 } };
+  }
+
+  const lastRow = sheet.getLastRow();
+  const lastColumn = sheet.getLastColumn();
+  if (lastRow < 2 || lastColumn < 13) {
+    return { movements: [], warnings: ['La hoja APLICACIONES no contiene columnas hasta M'], stats: { sheets: [ERP_APPLICATIONS_SHEET_NAME], rows: 0 } };
+  }
+
+  let dataRows = lastRow - 1;
+  const warnings = [];
+  if (dataRows > ERP_TRACE_MAX_ROWS_PER_SHEET) {
+    dataRows = ERP_TRACE_MAX_ROWS_PER_SHEET;
+    warnings.push('Hoja APLICACIONES limitada a ' + ERP_TRACE_MAX_ROWS_PER_SHEET + ' filas para evitar timeout');
+  }
+  const rows = sheet.getRange(2, 1, dataRows, lastColumn).getValues();
+  const movements = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (normalizeCvc_(row[4]) === normalizedCvc) { // APLICACIONES E
+      movements.push(applicationMovementFromFixedRow_(row));
+    }
+  }
+  return { movements: movements, warnings: warnings, stats: { sheets: [ERP_APPLICATIONS_SHEET_NAME], rows: rows.length } };
+}
+
+function contractSaleFromFixedRow_(row) {
   return {
-    origen: cleanValue_(raw.origen || raw.source || raw.hoja || raw.fuente),
-    fecha: cleanValue_(raw.fecha || raw.date),
-    tipo_operacion: cleanValue_(raw.tipo_operacion || raw.operacion || raw.movimiento),
-    cvc: normalizeCvc_(raw.cvc),
-    cvv: normalizeCvc_(raw.cvv),
-    cliente_proveedor: cleanValue_(raw.cliente_proveedor || raw.cliente || raw.proveedor || raw.counterparty),
-    sacos: cleanValue_(raw.sacos || raw.bags),
-    calidad: cleanValue_(raw.calidad || raw.quality),
-    estado: cleanValue_(raw.estado || raw.status)
+    cvc: normalizeCvc_(row[2]),            // C
+    cvv: normalizeCvc_(row[36]),           // AK
+    cliente: cleanValue_(row[39]),         // AN
+    sacos_vendidos: cleanValue_(row[43]),  // AR
+    fecha_factura: cleanValue_(row[56]),   // BE
+    transporte: cleanValue_(row[59]),      // BH
+    comentarios_venta: cleanValue_(row[63]) // BL
   };
 }
 
-function hasMovementData_(movement) {
-  return Boolean(movement && (movement.cvc || movement.cvv || movement.tipo_operacion || movement.sacos));
+function almacenMovementFromFixedRow_(row) {
+  const cvv = normalizeCvc_(row[25]); // Z
+  return {
+    origen: 'ALMACEN',
+    fecha: cleanValue_(cvv ? row[22] : row[1]), // W salida / B entrada
+    tipo_operacion: cvv ? 'SALIDA' : 'ENTRADA',
+    cvc: normalizeCvc_(row[9]),        // J
+    cvv: cvv,
+    cliente_proveedor: cleanValue_(row[24]), // Y
+    sacos: cleanValue_(cvv ? row[27] : row[12]), // AB vendidos / M entrada
+    calidad: cleanValue_(row[8]),      // I
+    estado: '',
+    almacen: cleanValue_(row[0]),      // A
+    stock_sacos: cleanValue_(row[21]), // V
+    comentarios: cleanValue_(row[20])  // U
+  };
+}
+
+function applicationMovementFromFixedRow_(row) {
+  return {
+    origen: 'APLICACIONES',
+    fecha: cleanValue_(row[1]),       // B
+    tipo_operacion: cleanValue_(row[3]), // D
+    cvc: normalizeCvc_(row[4]),       // E
+    cvv: normalizeCvc_(row[5]),       // F
+    cliente_proveedor: '',
+    sacos: cleanValue_(row[6]),       // G
+    calidad: '',
+    estado: cleanValue_(row[12]),     // M
+    id_aplicacion: cleanValue_(row[0]), // A
+    almacen: cleanValue_(row[7]),     // H
+    periodo: cleanValue_(row[8]),     // I
+    comentario: cleanValue_(row[9]),  // J
+    id_origen: cleanValue_(row[10])   // K
+  };
 }
 
 function buildTraceabilitySummary_(movements) {
+  if (!movements || movements.length === 0) {
+    return {};
+  }
   let totalBags = 0;
   let inBags = 0;
   let outBags = 0;
@@ -361,13 +423,42 @@ function uniqueCvvs_(movements, sales) {
   return result;
 }
 
-function readSheetTable_(sheet, aliases, cvcFallbackColumn, cvcHeaderName) {
+function mergeTraceStats_(movementStats, salesStats) {
+  const seen = {};
+  const sheets = [];
+  let rows = 0;
+  function addStats(stats) {
+    if (!stats) {
+      return;
+    }
+    rows += Number(stats.rows || 0);
+    const names = stats.sheets || [];
+    for (let i = 0; i < names.length; i++) {
+      const name = cleanValue_(names[i]);
+      if (name && !seen[name]) {
+        seen[name] = true;
+        sheets.push(name);
+      }
+    }
+  }
+  addStats(movementStats);
+  addStats(salesStats);
+  return { sheets: sheets, rows: rows };
+}
+
+function readSheetTable_(sheet, aliases, cvcFallbackColumn, cvcHeaderName, maxRows) {
   const lastRow = sheet.getLastRow();
   const lastColumn = sheet.getLastColumn();
+  if (lastRow <= 0 || lastColumn <= 0) {
+    return { error: 'La hoja ' + sheet.getName() + ' esta vacia' };
+  }
   if (lastRow < ERP_DATA_START_ROW || lastColumn < cvcFallbackColumn) {
     return { error: 'La hoja ' + sheet.getName() + ' no contiene datos suficientes' };
   }
 
+  if (lastColumn <= 0) {
+    return { error: 'La hoja ' + sheet.getName() + ' no contiene columnas suficientes' };
+  }
   const headers = sheet.getRange(ERP_HEADER_ROW, 1, 1, lastColumn).getValues()[0];
   const fieldIndexes = mapHeaders_(headers, aliases);
   const warnings = missingFieldWarnings_(fieldIndexes, aliases);
@@ -377,7 +468,15 @@ function readSheetTable_(sheet, aliases, cvcFallbackColumn, cvcHeaderName) {
     warnings.push('No se detecto columna ' + cvcHeaderName + ' por encabezado; se usa fallback columna C');
   }
 
-  const rows = sheet.getRange(ERP_DATA_START_ROW, 1, lastRow - ERP_DATA_START_ROW + 1, lastColumn).getValues();
+  let dataRows = lastRow - ERP_DATA_START_ROW + 1;
+  if (dataRows <= 0 || lastColumn <= 0) {
+    return { error: 'La hoja ' + sheet.getName() + ' no contiene filas de datos' };
+  }
+  if (maxRows && dataRows > maxRows) {
+    dataRows = maxRows;
+    warnings.push('Hoja ' + sheet.getName() + ' limitada a ' + maxRows + ' filas para evitar timeout');
+  }
+  const rows = sheet.getRange(ERP_DATA_START_ROW, 1, dataRows, lastColumn).getValues();
   return { rows: rows, fieldIndexes: fieldIndexes, warnings: warnings };
 }
 
@@ -551,6 +650,20 @@ function response_(status, cvc, data, matches, sales, summary, movements, associ
     resumen_trazabilidad: traceabilitySummary || {},
     warnings: warnings || []
   };
+}
+
+function traceResponse_(payload, startedAt, startedMs, stats) {
+  payload.source = 'google_sheets_trace';
+  payload.version = ERP_READONLY_VERSION;
+  payload.trazabilidad_movimientos = payload.trazabilidad_movimientos || [];
+  payload.cvv_asociados = payload.cvv_asociados || [];
+  payload.resumen_trazabilidad = payload.resumen_trazabilidad || {};
+  payload.warnings = payload.warnings || [];
+  payload.started_at = startedAt ? Utilities.formatDate(startedAt, Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm:ss") : '';
+  payload.elapsed_ms = startedMs ? Date.now() - startedMs : 0;
+  payload.hojas_consultadas = stats && stats.sheets ? stats.sheets : [];
+  payload.filas_analizadas = stats && stats.rows ? stats.rows : 0;
+  return payload;
 }
 
 function jsonResponse(payload) {

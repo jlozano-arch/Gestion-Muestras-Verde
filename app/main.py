@@ -34,6 +34,7 @@ from .erp_integration import (
     erp_traceability_movement_rows,
     erp_traceability_summary_rows,
     get_erp_data_by_cvc,
+    get_erp_trace_by_cvc,
 )
 
 # Create tables on startup
@@ -1166,6 +1167,30 @@ async def sample_detail(
         "erp_sales_columns": erp_sales_columns(),
         "erp_traceability_summary_rows": erp_traceability_summary_rows(erp_data),
         "erp_traceability_movement_rows": erp_traceability_movement_rows(erp_data),
+        "erp_traceability_movement_columns": erp_traceability_movement_columns(),
+    })
+
+
+@app.get("/samples/{sample_id}/erp-trace", response_class=HTMLResponse)
+async def sample_erp_trace(
+    sample_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    sample = db.query(Sample).filter(Sample.id == sample_id).first()
+    if not sample:
+        raise HTTPException(status_code=404, detail="Muestra no encontrada")
+
+    erp_trace = get_erp_trace_by_cvc(sample.purchase_contract_cvc) if sample.purchase_contract_cvc else {"status": "no_cvc"}
+    return templates.TemplateResponse("erp_trace.html", {
+        "request": request,
+        "sample": sample,
+        "erp_data": erp_trace,
+        "erp_summary_rows": erp_commercial_summary_rows(erp_trace),
+        "erp_sales_rows": erp_sales_rows(erp_trace),
+        "erp_sales_columns": erp_sales_columns(),
+        "erp_traceability_summary_rows": erp_traceability_summary_rows(erp_trace),
+        "erp_traceability_movement_rows": erp_traceability_movement_rows(erp_trace),
         "erp_traceability_movement_columns": erp_traceability_movement_columns(),
     })
 
