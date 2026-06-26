@@ -13,6 +13,9 @@ services:
       - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8000}
       - ERP_SOURCE=${ERP_SOURCE:-file}
       - ERP_APPS_SCRIPT_URL=${ERP_APPS_SCRIPT_URL:-}
+      - DEBUG_LABEL_LAYOUT=${DEBUG_LABEL_LAYOUT:-false}
+      - LABEL_OFFSET_X_MM=${LABEL_OFFSET_X_MM:-0}
+      - LABEL_OFFSET_Y_MM=${LABEL_OFFSET_Y_MM:-0}
       - DEBUG=true
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped

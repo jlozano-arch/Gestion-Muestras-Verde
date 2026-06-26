@@ -2062,7 +2062,13 @@ async def create_shipment(
 # ============================================================================
 
 # Avery L7108REV calibration.
-# Medidas reales verificadas sobre hoja fisica A4 el 2026-06-24.
+# Medidas fisicas Avery L7108REV:
+# - A4: 210 x 297 mm
+# - margen lateral: 7 mm
+# - margen superior fisico: 10 mm
+# - gap horizontal: 5 mm
+# - gap vertical: 5 mm
+# - etiqueta: 62 x 89 mm
 PAGE_WIDTH_MM = 210
 PAGE_HEIGHT_MM = 297
 LEFT_MARGIN_MM = 7
@@ -2079,7 +2085,7 @@ INTERNAL_LABEL_WIDTH_MM = LABEL_HEIGHT_MM
 INTERNAL_LABEL_HEIGHT_MM = LABEL_WIDTH_MM
 DEBUG_LABEL_LAYOUT = os.getenv("DEBUG_LABEL_LAYOUT", "false").lower() == "true"
 LABEL_OFFSET_X_MM = float(os.getenv("LABEL_OFFSET_X_MM", "0"))
-LABEL_OFFSET_Y_MM = float(os.getenv("LABEL_OFFSET_Y_MM", "-10"))
+LABEL_OFFSET_Y_MM = float(os.getenv("LABEL_OFFSET_Y_MM", "0"))
 
 
 def _build_avery_l7108rev_layout():
@@ -2345,22 +2351,69 @@ def _avery_l7108rev_slots(layout, page_height):
 
 
 def _draw_avery_debug_guides(c, slot, layout):
+    center_x = slot["x"] + layout["cell_width"] / 2
+    center_y = slot["y"] + layout["cell_height"] / 2
+
     c.saveState()
     c.setStrokeColor(HexColor("#D91E18"))
     c.setLineWidth(0.35)
     c.rect(slot["x"], slot["y"], layout["cell_width"], layout["cell_height"], stroke=1, fill=0)
+    c.setStrokeColor(HexColor("#2563EB"))
+    c.setLineWidth(0.2)
+    c.line(center_x, slot["y"], center_x, slot["y"] + layout["cell_height"])
+    c.line(slot["x"], center_y, slot["x"] + layout["cell_width"], center_y)
     c.setFillColor(HexColor("#D91E18"))
     c.setFont("Helvetica-Bold", 6)
     c.drawString(slot["x"] + 2 * mm, slot["y"] + layout["cell_height"] - 4 * mm, f"Pos {slot['position']}")
     c.setFont("Helvetica", 5.5)
     c.drawString(slot["x"] + 2 * mm, slot["y"] + layout["cell_height"] - 7.2 * mm, f"F{slot['row']} C{slot['col']}")
     c.drawString(slot["x"] + 2 * mm, slot["y"] + 3 * mm, f"x={slot['x'] / mm:.1f} y={slot['y'] / mm:.1f} mm")
+    c.drawString(slot["x"] + 2 * mm, slot["y"] + 5.8 * mm, f"cx={center_x / mm:.1f} cy={center_y / mm:.1f} mm")
     c.restoreState()
 
 
 def _draw_avery_debug_page(c, slots, layout):
     for slot in slots:
         _draw_avery_debug_guides(c, slot, layout)
+
+
+def _draw_corner_cross(c, x: float, y: float, size: float):
+    c.line(x - size, y, x + size, y)
+    c.line(x, y - size, x, y + size)
+
+
+def _draw_avery_calibration_slot(c, slot, layout):
+    x = slot["x"]
+    y = slot["y"]
+    width = layout["cell_width"]
+    height = layout["cell_height"]
+    cross_size = 2.5 * mm
+
+    c.saveState()
+    c.setStrokeColor(HexColor("#000000"))
+    c.setFillColor(HexColor("#000000"))
+    c.setLineWidth(0.2)
+    c.rect(x, y, width, height, stroke=1, fill=0)
+    _draw_corner_cross(c, x, y, cross_size)
+    _draw_corner_cross(c, x + width, y, cross_size)
+    _draw_corner_cross(c, x, y + height, cross_size)
+    _draw_corner_cross(c, x + width, y + height, cross_size)
+    c.setFont("Helvetica", 9)
+    c.drawCentredString(x + width / 2, y + height / 2 - 3, str(slot["position"]))
+    c.restoreState()
+
+
+def _render_avery_l7108rev_calibration() -> io.BytesIO:
+    layout = AVERY_L7108REV
+    pdf_buffer = io.BytesIO()
+    c = canvas.Canvas(pdf_buffer, pagesize=A4)
+    _, page_height = A4
+    slots = _avery_l7108rev_slots(layout, page_height)
+    for slot in slots:
+        _draw_avery_calibration_slot(c, slot, layout)
+    c.save()
+    pdf_buffer.seek(0)
+    return pdf_buffer
 
 
 def _render_avery_l7108rev_sheet(samples, request: Request, copies: int = 1, start_position: int = 1) -> io.BytesIO:
@@ -2406,6 +2459,16 @@ async def generate_label(sample_id: int, request: Request, db: Session = Depends
 
     pdf_buffer = _render_avery_l7108rev_sheet([sample], request, copies=1, start_position=1)
     headers = {"Content-Disposition": f"attachment; filename=\"avery_l7108rev_{sample.code}.pdf\""}
+    return StreamingResponse(pdf_buffer, media_type="application/pdf", headers=headers)
+
+
+@app.get("/labels/calibration")
+async def generate_labels_calibration(model: str = "L7108REV"):
+    """Generar plantilla de calibracion Avery L7108REV sin contenido de muestra."""
+    if model != "L7108REV":
+        raise HTTPException(status_code=400, detail="Modelo Avery no soportado")
+    pdf_buffer = _render_avery_l7108rev_calibration()
+    headers = {"Content-Disposition": "attachment; filename=\"avery_calibration.pdf\""}
     return StreamingResponse(pdf_buffer, media_type="application/pdf", headers=headers)
 
 
