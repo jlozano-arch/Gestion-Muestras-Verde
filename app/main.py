@@ -28,6 +28,10 @@ from .countries import get_country_name, get_country_flag, get_all_countries
 from .erp_integration import (
     erp_commercial_summary_rows,
     erp_display_rows,
+    erp_public_associated_cvvs,
+    erp_public_trace_contract_rows,
+    erp_public_traceability_movement_columns,
+    erp_public_traceability_movement_rows,
     erp_sales_columns,
     erp_sales_rows,
     erp_traceability_movement_columns,
@@ -745,6 +749,30 @@ async def public_sample_detail(sample_id: int, request: Request, db: Session = D
         "erp_rows": erp_display_rows(erp_data, public=True),
         "erp_summary_rows": erp_commercial_summary_rows(erp_data, public=True),
         "erp_traceability_summary_rows": erp_traceability_summary_rows(erp_data, public=True),
+    })
+
+
+@app.get("/public/samples/{sample_id}/erp-trace", response_class=HTMLResponse)
+async def public_sample_erp_trace(
+    sample_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    sample = db.query(Sample).filter(Sample.id == sample_id).first()
+    if not sample:
+        raise HTTPException(status_code=404, detail="Muestra no encontrada")
+
+    erp_trace = get_erp_trace_by_cvc(sample.purchase_contract_cvc) if sample.purchase_contract_cvc else {"status": "no_cvc"}
+
+    return templates.TemplateResponse("public_erp_trace.html", {
+        "request": request,
+        "sample": sample,
+        "erp_data": erp_trace,
+        "erp_contract_rows": erp_public_trace_contract_rows(erp_trace),
+        "erp_traceability_summary_rows": erp_traceability_summary_rows(erp_trace, public=True),
+        "associated_cvvs": erp_public_associated_cvvs(erp_trace),
+        "erp_traceability_movement_rows": erp_public_traceability_movement_rows(erp_trace),
+        "erp_traceability_movement_columns": erp_public_traceability_movement_columns(),
     })
 
 

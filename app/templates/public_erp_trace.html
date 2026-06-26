@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Trazabilidad ERP - {{ sample.code }}{% endblock %}
+
+{% block content %}
+<main class="public-sample-page">
+    <section class="public-mobile-card">
+        <header class="public-mobile-header">
+            <span class="eyebrow"><i class="fa-solid fa-route"></i> ERP Indian</span>
+            <h2>Trazabilidad ERP</h2>
+            <p class="lead">{{ display_value(sample.quality, 'Muestra') }} &middot; CVC {{ display_value(sample.purchase_contract_cvc) }}</p>
+            <a href="/public/samples/{{ sample.id }}" class="btn btn-secondary public-action">
+                <i class="fa-solid fa-arrow-left"></i> Volver a ficha publica
+            </a>
+        </header>
+
+        <section class="public-section first">
+            {% if not erp_data or erp_data.status in ['not_configured', 'error'] %}
+            <p class="empty">Trazabilidad ERP no disponible temporalmente.</p>
+            {% elif erp_data.status == 'no_cvc' %}
+            <p class="empty">Sin CVC para consultar trazabilidad.</p>
+            {% elif erp_data.status == 'not_found' %}
+            <p class="empty">No encontrado en el ERP.</p>
+            {% elif erp_data.status == 'multiple' %}
+            <p class="empty">Varias coincidencias en ERP para este CVC.</p>
+            {% elif erp_data.status == 'found' %}
+            <h3>Resumen publico</h3>
+
+            {% if erp_contract_rows %}
+            <div class="public-key-data">
+                {% for row in erp_contract_rows %}
+                <div class="public-data-row">
+                    <span>{{ row.label }}</span>
+                    <strong>{{ row.value }}</strong>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if erp_traceability_summary_rows %}
+            <div class="public-key-data">
+                {% for row in erp_traceability_summary_rows %}
+                <div class="public-data-row">
+                    <span>{{ row.label }}</span>
+                    <strong>{{ row.value }}</strong>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% endif %}
+        </section>
+
+        {% if erp_data and erp_data.status == 'found' %}
+        <section class="public-section">
+            <h3>CVV asociados</h3>
+            {% if associated_cvvs %}
+            <div class="public-key-data">
+                <div class="public-data-row">
+                    <span>Numero CVV</span>
+                    <strong>{{ associated_cvvs|length }}</strong>
+                </div>
+                <div class="public-data-row">
+                    <span>CVV</span>
+                    <strong>{{ associated_cvvs|join(', ') }}</strong>
+                </div>
+            </div>
+            {% else %}
+            <p class="empty">Sin CVV asociados.</p>
+            {% endif %}
+        </section>
+
+        <section class="public-section">
+            <h3>Movimientos</h3>
+            {% if erp_traceability_movement_rows %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            {% for col in erp_traceability_movement_columns %}
+                            <th>{{ col.label }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for movement in erp_traceability_movement_rows %}
+                        <tr>
+                            {% for col in erp_traceability_movement_columns %}
+                            <td>{{ movement.get(col.field, '-') }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="empty">Sin movimientos publicos disponibles.</p>
+            {% endif %}
+        </section>
+        {% endif %}
+    </section>
+</main>
+{% endblock %}

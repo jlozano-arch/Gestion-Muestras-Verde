@@ -235,6 +235,16 @@ PRIVATE_MOVEMENT_FIELDS = [
     "status",
 ]
 
+PUBLIC_MOVEMENT_FIELDS = [
+    "date",
+    "operation_type",
+    "cvc",
+    "cvv",
+    "bags",
+    "quality",
+    "status",
+]
+
 
 def normalize_cvc(cvc: str | None) -> str:
     if cvc is None:
@@ -639,3 +649,40 @@ def erp_traceability_movement_rows(data: dict | None) -> list[dict[str, str]]:
 
 def erp_traceability_movement_columns() -> list[dict[str, str]]:
     return [{"field": field, "label": MOVEMENT_LABELS[field]} for field in PRIVATE_MOVEMENT_FIELDS]
+
+
+def erp_public_trace_contract_rows(data: dict | None) -> list[dict[str, str]]:
+    if not data or data.get("status") != "found":
+        return []
+    record = data.get("data") or {}
+    rows = []
+    for field in ["quality", "contract_status", "contract_date"]:
+        value = _clean_value(record.get(field))
+        if value:
+            rows.append({"label": DISPLAY_LABELS[field], "value": value})
+    return rows
+
+
+def erp_public_associated_cvvs(data: dict | None) -> list[str]:
+    if not data or data.get("status") != "found":
+        return []
+    return [_clean_value(item) for item in data.get("associated_cvvs") or [] if _clean_value(item)]
+
+
+def erp_public_traceability_movement_rows(data: dict | None) -> list[dict[str, str]]:
+    if not data or data.get("status") != "found":
+        return []
+    rows = []
+    for movement in data.get("traceability_movements") or []:
+        row = {}
+        for field in PUBLIC_MOVEMENT_FIELDS:
+            value = _clean_value(movement.get(field))
+            if value:
+                row[field] = value
+        if row:
+            rows.append(row)
+    return rows
+
+
+def erp_public_traceability_movement_columns() -> list[dict[str, str]]:
+    return [{"field": field, "label": MOVEMENT_LABELS[field]} for field in PUBLIC_MOVEMENT_FIELDS]

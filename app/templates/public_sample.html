@@ -131,6 +131,13 @@
             {% else %}
             <p class="empty">No encontrado en el ERP.</p>
             {% endif %}
+            {% if sample.purchase_contract_cvc %}
+            <a class="btn btn-secondary public-action" href="/public/samples/{{ sample.id }}/erp-trace">
+                <i class="fa-solid fa-route"></i> Consultar trazabilidad ERP
+            </a>
+            {% else %}
+            <p class="empty">Sin CVC para consultar trazabilidad.</p>
+            {% endif %}
         </section>
 
         <section class="public-section">
