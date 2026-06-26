@@ -60,9 +60,9 @@
                     <span>Numero CVV</span>
                     <strong>{{ associated_cvvs|length }}</strong>
                 </div>
-                <div class="public-data-row">
+                <div class="public-data-row public-cvv-row">
                     <span>CVV</span>
-                    <strong>{{ associated_cvvs|join(', ') }}</strong>
+                    <strong class="public-cvv-list">{{ associated_cvvs|join(', ') }}</strong>
                 </div>
             </div>
             {% else %}
@@ -70,10 +70,10 @@
             {% endif %}
         </section>
 
-        <section class="public-section">
+        <section class="public-section" id="movimientos">
             <h3>Movimientos</h3>
             {% if erp_traceability_movement_rows %}
-            <div class="table-responsive">
+            <div class="table-responsive public-trace-table">
                 <table class="table">
                     <thead>
                         <tr>
@@ -92,6 +92,40 @@
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+            <div class="public-trace-cards">
+                {% for movement in erp_traceability_movement_rows %}
+                <article class="public-trace-card">
+                    <div class="public-trace-card-head">
+                        <span>CVV</span>
+                        <strong>{{ movement.get('cvv', '-') }}</strong>
+                    </div>
+                    <div class="public-trace-card-grid">
+                        <div>
+                            <span>Fecha</span>
+                            <strong>{{ movement.get('date', '-') }}</strong>
+                        </div>
+                        <div>
+                            <span>Operacion</span>
+                            <strong>{{ movement.get('operation_type', '-') }}</strong>
+                        </div>
+                        <div>
+                            <span>Sacos/kg</span>
+                            <strong>{{ movement.get('bags', '-') }}</strong>
+                        </div>
+                        <div>
+                            <span>Estado</span>
+                            <strong>{{ movement.get('status', '-') }}</strong>
+                        </div>
+                    </div>
+                    {% if movement.get('quality') %}
+                    <div class="public-trace-card-quality">
+                        <span>Calidad</span>
+                        <strong>{{ movement.get('quality') }}</strong>
+                    </div>
+                    {% endif %}
+                </article>
+                {% endfor %}
             </div>
             {% else %}
             <p class="empty">Sin movimientos publicos disponibles.</p>
