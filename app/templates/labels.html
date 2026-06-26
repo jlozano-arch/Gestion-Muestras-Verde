@@ -22,10 +22,12 @@
         <div class="card-body">
             <div class="label-selection-summary" id="label-selection-summary">
                 <strong>{{ selected_label_samples|length }}</strong>
-                <span>muestras seleccionadas</span>
+                <span id="label-selection-text">etiquetas seleccionadas</span>
                 <small id="label-selection-codes">
                     {% if selected_label_samples %}
-                        {{ selected_label_samples|map(attribute='code')|join(', ') }}
+                        {% for sample in selected_label_samples %}
+                            {{ sample.purchase_contract_cvc or '—' }}{% if not loop.last %}, {% endif %}
+                        {% endfor %}
                     {% else %}
                         Selecciona muestras en la tabla o vuelve desde el listado.
                     {% endif %}
@@ -69,12 +71,12 @@
             </div>
             <div class="card-body table-responsive">
                 <table class="table">
-                    <thead><tr><th></th><th>Codigo</th><th>Pais</th><th>Origen</th><th>Proveedor</th><th>Ref. proveedor</th></tr></thead>
+                    <thead><tr><th></th><th>CVC</th><th>Pais</th><th>Origen</th><th>Proveedor</th><th>Ref. proveedor</th></tr></thead>
                     <tbody>
                     {% for s in all_samples %}
                     <tr>
-                        <td><input type="checkbox" name="ids" value="{{ s.id }}" data-code="{{ s.code }}" {% if s.id in selected_label_ids %}checked{% endif %}></td>
-                        <td><a href="/samples/{{ s.id }}">{{ s.code }}</a></td>
+                        <td><input type="checkbox" name="ids" value="{{ s.id }}" data-code="{{ s.purchase_contract_cvc or '—' }}" {% if s.id in selected_label_ids %}checked{% endif %}></td>
+                        <td><a href="/samples/{{ s.id }}">{{ s.purchase_contract_cvc or '—' }}</a></td>
                         <td>{{ s.country_name or '-' }}</td>
                         <td>{{ s.origin or '-' }}</td>
                         <td>{{ s.producer or '-' }}</td>
@@ -99,6 +101,7 @@ const slots = Array.from(document.querySelectorAll('.label-slot'));
 const labelChecks = Array.from(document.querySelectorAll('input[name="ids"]'));
 const summary = document.getElementById('label-selection-summary');
 const summaryCount = summary.querySelector('strong');
+const summaryText = document.getElementById('label-selection-text');
 const summaryCodes = document.getElementById('label-selection-codes');
 
 function paintStartPosition() {
@@ -115,6 +118,7 @@ paintStartPosition();
 function updateSelectionSummary() {
     const selected = labelChecks.filter(c => c.checked);
     summaryCount.textContent = selected.length;
+    summaryText.textContent = selected.length === 1 ? 'etiqueta seleccionada' : 'etiquetas seleccionadas';
     summaryCodes.textContent = selected.length
         ? selected.map(c => c.dataset.code || c.value).join(', ')
         : 'Selecciona muestras en la tabla o vuelve desde el listado.';
