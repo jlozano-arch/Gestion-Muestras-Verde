@@ -33,6 +33,11 @@
                     {% endif %}
                 </small>
             </div>
+            <div class="label-usage-bar" id="label-usage-bar" aria-label="Ocupacion de la hoja Avery actual">
+                {% for pos in range(1, 10) %}
+                <span class="label-usage-dot" data-position="{{ pos }}">{{ pos }}</span>
+                {% endfor %}
+            </div>
             <div class="form-row">
                 <div class="form-group">
                     <label>Modelo</label>
@@ -103,6 +108,8 @@ const summary = document.getElementById('label-selection-summary');
 const summaryCount = summary.querySelector('strong');
 const summaryText = document.getElementById('label-selection-text');
 const summaryCodes = document.getElementById('label-selection-codes');
+const usageDots = Array.from(document.querySelectorAll('.label-usage-dot'));
+const labelsPerSheet = 9;
 
 function paintStartPosition() {
     const start = Number(startSelect.value);
@@ -117,11 +124,28 @@ paintStartPosition();
 
 function updateSelectionSummary() {
     const selected = labelChecks.filter(c => c.checked);
-    summaryCount.textContent = selected.length;
-    summaryText.textContent = selected.length === 1 ? 'etiqueta seleccionada' : 'etiquetas seleccionadas';
+    const selectedCount = selected.length;
+    const sheetsNeeded = Math.ceil(selectedCount / labelsPerSheet);
+    const remainder = selectedCount % labelsPerSheet;
+    const currentSheetUsed = selectedCount === 0 ? 0 : (remainder === 0 ? labelsPerSheet : remainder);
+    const remainingCurrentSheet = selectedCount === 0 ? labelsPerSheet : labelsPerSheet - currentSheetUsed;
+
+    summaryCount.textContent = selectedCount;
+    if (selectedCount === 0) {
+        summaryText.textContent = 'etiquetas seleccionadas · hoja vacía';
+    } else if (selectedCount < labelsPerSheet) {
+        summaryText.textContent = `${selectedCount === 1 ? 'etiqueta seleccionada' : 'etiquetas seleccionadas'} · faltan ${remainingCurrentSheet} para completar la hoja`;
+    } else if (selectedCount === labelsPerSheet) {
+        summaryText.textContent = 'etiquetas seleccionadas · hoja completa';
+    } else {
+        summaryText.textContent = `etiquetas seleccionadas · ${sheetsNeeded} hojas necesarias · última hoja: ${currentSheetUsed}/${labelsPerSheet}`;
+    }
     summaryCodes.textContent = selected.length
         ? selected.map(c => c.dataset.code || c.value).join(', ')
         : 'Selecciona muestras en la tabla o vuelve desde el listado.';
+    usageDots.forEach((dot, index) => {
+        dot.classList.toggle('is-filled', index < currentSheetUsed);
+    });
 }
 
 labelChecks.forEach((check) => check.addEventListener('change', updateSelectionSummary));

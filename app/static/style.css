@@ -2379,6 +2379,33 @@ legend {
     white-space: nowrap;
 }
 
+.label-usage-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: -0.35rem 0 0.9rem;
+    padding: 0 0.2rem;
+}
+
+.label-usage-dot {
+    width: 1.35rem;
+    height: 1.35rem;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 700;
+    background: var(--surface);
+}
+
+.label-usage-dot.is-filled {
+    border-color: var(--primary);
+    background: rgba(42, 124, 68, 0.12);
+    color: var(--primary);
+}
+
 .import-preview-table {
     font-size: 0.82rem;
 }
